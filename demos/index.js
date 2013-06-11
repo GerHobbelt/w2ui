@@ -11,8 +11,8 @@ $(function () {
 	w2ui['main_layout'].content('top', '<div style="padding: 9px;">'+
 		'Theme: '+
 		'<select onchange="$(\'#mainCSS\').attr(\'href\', this.value);">'+
-		'	<option value="../css/w2ui.min.css">Default Theme</option>'+
-		'	<option value="../css/w2ui-dark.min.css">Dark Theme</option>'+
+		'	<option value="../css/w2ui.css">Default Theme</option>'+
+		'	<option value="../css/w2ui-dark.css">Dark Theme</option>'+
 		'</select>&nbsp;&nbsp;&nbsp;'+
 		'Locale: '+
 		'<select onchange="w2utils.locale({ path: \'../\', lang: this.value }); alert(\'Localization is only internal functions. You need to refresh to see it.\')">'+

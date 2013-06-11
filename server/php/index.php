@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <link rel="stylesheet" type="text/css" href="../../css/w2ui-1.2.min.css" />
-    <script type="text/javascript" src="../../js/jquery.min.js"></script>
-    <script type="text/javascript" src="../../js/w2ui-1.2.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="../../css/w2ui.css" />
+    <script type="text/javascript" src="../../js/jquery.js"></script>
+    <script type="text/javascript" src="../../js/w2ui.js"></script>
 </head>
 <body>
     <div id="users" style="width: 100%; height: 600px;"></div>
