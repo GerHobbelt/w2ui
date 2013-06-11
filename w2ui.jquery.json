@@ -46,6 +46,6 @@
     "docs"		: "http://w2ui.com/web/docs",
     "download"	: "http://w2ui.com/web/downloads/w2ui-1.2.zip",
     "dependencies": {
-        "jquery": ">=1.7"
+        "jquery": ">=1.9"
     }
 }

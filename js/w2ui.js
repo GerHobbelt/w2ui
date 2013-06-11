@@ -567,7 +567,45 @@ var w2utils = (function () {
 		}, time * 1000);
 		
 		function cross(property, value, none_webkit_value) {
-			if (!$.browser.webkit && typeof none_webkit_value != 'undefined') value = none_webkit_value;
+			// detect translate3d CSS existing according to 
+			// http://stackoverflow.com/questions/5661671/detecting-transform-translate3d-support
+			// -->
+			// https://gist.github.com/lorenzopolidori/3794226
+			// -->
+			// https://gist.github.com/jgonera/5250507
+			//
+			// (And, yes, we 'know' we only get called with three arguments when we're about to produce a translate3D-based transition...)
+			if (!w2utils.__translate3d_detect) {
+				function has3d() {
+					var el = $('<p>')[0], $iframe = $('<iframe>'), has3d, t,
+						transforms = {
+							'webkitTransform': '-webkit-transform',
+							'OTransform': '-o-transform',
+							'msTransform': '-ms-transform',
+					        'MozTransform': '-moz-transform',
+							'transform': 'transform'
+						};
+				 
+					// Add it to the body to get the computed style
+					// Sandbox it inside an iframe to avoid Android Browser quirks
+					$iframe.appendTo('body').contents().find('body').append( el );
+				 
+					for (t in transforms) {
+						if (el.style[t] !== undefined) {
+							el.style[t] = 'translate3d(1px,1px,1px)';
+							has3d = window.getComputedStyle(el).getPropertyValue(transforms[t]);
+						}
+					}
+				 
+					$iframe.remove();
+				 
+					return (has3d !== undefined && has3d.length > 0 && has3d !== "none");
+				}
+
+				w2utils.__translate3d_detect = (has3d() ? 1 : -1);
+			}
+
+			if (w2utils.__translate3d_detect !== 1 && typeof none_webkit_value != 'undefined') value = none_webkit_value;
 			return ';'+ property +': '+ value +'; -webkit-'+ property +': '+ value +'; -moz-'+ property +': '+ value +'; '+
 				   '-ms-'+ property +': '+ value +'; -o-'+ property +': '+ value +';';
 		}
