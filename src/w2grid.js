@@ -8,16 +8,13 @@
 * == NICE TO HAVE ==
 *	- global search apply types and drop downs
 *	- editable fields (list) - better inline editing
-*	- infinite scroll (buffered scroll)
 *	- frozen columns
 *	- column autosize based on largest content
 *	- more events in editable fields (onkeypress)
 *	- on/off line number and select column
 *	- subgrid (easy way with keyboard navigation)
-*	- search 1-20 will range numbers
-*	- route all toolbar events thru the grid
-* 	- need to clean up onRequest, onSave, onLoad commands
-* 	- mode record with keyboard, grid does not follow
+* 	- move record with keyboard, grid does not follow
+*	- select group then click anywhere: record style is broken
 *
 * == 1.3 changes ==
 *	- added getRecordHTML, refactored, updated set()
@@ -34,14 +31,24 @@
 * 	- added record.changed, record.changes
 *	- doExpand -> expand, collapse, toggle, onCollapse
 *	- remove record.hidden
-*	- grid.set(record) - updates all records
+*	- grid.set([recid], record, [noRefresh]) - updates all records
 *	- deprecated selectPage()
 *	- added onReload (when toolbar button is clicked)
 *	- column.title - can be a string or a function
 *	- hints for records (columns?)
 *	- select multiple recors (shift) in a searched list - selects more then needed
-*	- added initKeyboard()
 * 	- error when using left/right arrow keys (second click disconnects from the event listener)
+*	- deprecated recordsPerPage, page, goto()
+* 	- added onDeleted, onSaved - when it returns from the server
+* 	- added buffered, limit, offset
+* 	- need to clean up onRequest, onSave, onLoad commands
+*	- added onToolbar event - click on any toolbar button
+*	- route all toolbar events thru the grid
+*	- infinite scroll (buffered scroll)
+*	- search 1-20 will range numbers
+*	- moved some settings to prototype
+* 	- added record.expanded = 'none' || 'spinner'
+*	- added lock(.., spinner) - show spinner
 *
 ************************************************************************/
 
@@ -78,30 +85,32 @@
 			toolbarAdd		: false,
 			toolbarDelete 	: false,
 			toolbarSave	 	: false
-		},
+		}
 
-		this.fixedBody			= true;		// if false; then grid grows with data
-		this.recordHeight		= 25;
-		this.multiSearch		= true;
-		this.multiSelect		= true;
-		this.multiSort			= true;
-		this.keyboard			= true;		// if user clicks on the list; it will bind all events from the keyboard for that list
+		this.fixedBody		= true;		// if false; then grid grows with data
+		this.recordHeight	= 25;
+		this.multiSearch	= true;
+		this.multiSelect	= true;
+		this.multiSort		= true;
 
-		this.total				= 0;		// total number of records
-		this.page				= 0; 		// current page
-		this.recordsPerPage		= 50;
-		this.style				= '';
+		this.total			= 0;		// server total
+		this.buffered		= 0;		// number of records in the records array
+		this.limit			= 100;
+		this.offset			= 0;
+		this.style			= '';
 
-		this.msgDelete			= w2utils.lang('Are you sure you want to delete selected records?');
-		this.msgNotJSON 		= w2utils.lang('Returned data is not in valid JSON format.');
-		this.msgRefresh			= w2utils.lang('Refreshing...');
+		this.msgDelete		= w2utils.lang('Are you sure you want to delete selected records?');
+		this.msgNotJSON 	= w2utils.lang('Returned data is not in valid JSON format.');
+		this.msgRefresh		= w2utils.lang('Refreshing...');
 
 		// events
+		this.onAdd				= null;
 		this.onRequest			= null;		// called on any server event
 		this.onLoad				= null;
-		this.onAdd				= null;
 		this.onDelete			= null;
+		this.onDeleted			= null
 		this.onSave 			= null;
+		this.onSaved			= null;
 		this.onSelect			= null;
 		this.onUnselect 		= null;
 		this.onClick 			= null;
@@ -113,6 +122,7 @@
 		this.onCollapse			= null;
 		this.onError 			= null;
 		this.onKeyboard			= null;
+		this.onToolbar			= null; 	// all events from toolbar
 		this.onRender 			= null;
 		this.onRefresh 			= null;
 		this.onReload			= null;
@@ -141,7 +151,7 @@
 			navigator.userAgent.toLowerCase().indexOf('ipod') != -1 ||
 			navigator.userAgent.toLowerCase().indexOf('ipad') != -1) ? true : false;
 
-		$.extend(true, this, options);
+		$.extend(true, this, options, w2obj.grid);
 	};
 
 	// ====================================================
@@ -191,7 +201,7 @@
 				}
 				object.records[r] = $.extend(true, {}, records[r]);
 			}
-			if (object.records.length > 0) object.total = object.records.length;
+			if (object.records.length > 0) object.buffered = object.records.length;
 			// add searches
 			for (var c in object.columns) {
 				var col = object.columns[c];
@@ -236,7 +246,7 @@
 				this.records.push(record[o]);
 				added++;
 			}
-			this.total = this.records.length;
+			this.buffered = this.records.length;
 			if (this.url == '') {
 				this.localSort();
 				this.localSearch();
@@ -262,27 +272,32 @@
 			return recs;
 		},
 
-		set: function (recid, record) { // does not delete existing, but overrides on top of it
-			// update all records
-			if (arguments.length == 1) {
-				for (var r in this.records) {
-					$.extend(true, this.records[r], recid); // recid is the whole record
-				}
-				this.refresh();
-				return true;
+		set: function (recid, record, noRefresh) { // does not delete existing, but overrides on top of it
+			if (typeof recid == 'object') {
+				noRefresh 	= record;
+				record 		= recid;
+				recid  		= null;
 			}
-			// find record to update
-			if (arguments.length == 2) {
+			// update all records
+			if (recid == null) {
+				for (var r in this.records) {
+					$.extend(true, this.records[r], record); // recid is the whole record
+				}
+				if (noRefresh !== true) this.refresh();
+				return true;
+			} else { // find record to update
 				var ind = this.get(recid, true);
 				if (ind == null) return false;
 				$.extend(true, this.records[ind], record);
 				// refresh only that record
-				var tr = $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(recid));
-				if (tr.length != 0) {
-					var line = tr.attr('line');
-					// if it is searched, find index in search array
-					if (this.searchData.length > 0) for (var s in this.last.searchIds) if (this.last.searchIds[s] == ind) ind = s;
-					$(tr).replaceWith(this.getRecordHTML(ind, line));
+				if (noRefresh !== true) {
+					var tr = $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(recid));
+					if (tr.length != 0) {
+						var line = tr.attr('line');
+						// if it is searched, find index in search array
+						if (this.searchData.length > 0 && this.url == '') for (var s in this.last.searchIds) if (this.last.searchIds[s] == ind) ind = s;
+						$(tr).replaceWith(this.getRecordHTML(ind, line));
+					}
 				}
 				return true;
 			}
@@ -305,7 +320,7 @@
 				}
 			}
 			if (this.url == '') {
-				this.total = this.records.length;
+				this.buffered = this.records.length;
 				this.localSort();
 				this.localSearch();
 			}
@@ -451,12 +466,16 @@
 		},		
 
 		clear: function () {
-			this.records = [];
-			this.total   = 0;
+			this.records	= [];
+			this.buffered   = 0;
 			this.refresh();
 		},
 
 		localSort: function (silent) {
+			if (this.url != '') {
+				console.log('ERROR: grid.localSort can only be used on local data source, grid.url should be empty.');
+				return;
+			}
 			var time = (new Date()).getTime();
 			var obj = this;
 			this.records.sort(function (a, b) {
@@ -484,20 +503,24 @@
 		},
 
 		localSearch: function (silent) {
+			if (this.url != '') {
+				console.log('ERROR: grid.localSearch can only be used on local data source, grid.url should be empty.');
+				return;
+			}
 			var time = (new Date()).getTime();
 			var obj = this;
 			this.total = this.records.length;
 			// mark all records as shown
 			this.last.searchIds = [];
 			// hide records that did not match
-			if (this.searchData.length > 0) {
+			if (this.searchData.length > 0 && this.url == '') {
 				this.total = 0;
 				for (var r in this.records) {
 					var rec = this.records[r];
 					var fl  = 0;
-					for (var s in this.searches) {
-						var search 	= this.searches[s];
-						var sdata  	= this.getSearchData(search.field);
+					for (var s in this.searchData) {
+						var sdata  	= this.searchData[s];
+						var search 	= this.getSearch(sdata.field);
 						if (sdata == null) continue;
 						var val1 = String(obj.parseObj(rec, search.field)).toLowerCase();
 						if (typeof sdata.value != 'undefined') {
@@ -548,6 +571,7 @@
 				}
 				this.total = this.last.searchIds.length;
 			}
+			this.buffered = this.total;
 			time = (new Date()).getTime() - time;
 			if (silent !== true) setTimeout(function () { $('#grid_'+ obj.name +'_footer').find('.w2ui-footer-left').html('Search took ' + time/1000 + ' sec'); }, 10);
 			return time;
@@ -564,7 +588,7 @@
 				// default action
 				var i = this.get(record.recid, true);
 				record.selected = true;
-				$('#grid_'+this.name +'_rec_'+ w2utils.escapeId(record.recid)).addClass('w2ui-selected').data('selected', 'yes');
+				$('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(record.recid)).addClass('w2ui-selected').data('selected', 'yes');
 				$('#grid_'+ this.name +'_cell_'+ i +'_select_check').prop('checked', true);
 				selected++;
 				// event after
@@ -600,7 +624,7 @@
 				// default action
 				var i = this.get(record.recid, true);
 				record.selected = false
-				$('#grid_'+this.name +'_rec_'+ w2utils.escapeId(record.recid)).removeClass('w2ui-selected').data('selected', '');
+				$('#grid_'+this.name +'_rec_'+ w2utils.escapeId(record.recid)).removeClass('w2ui-selected').removeData('selected');
 				if ($('#grid_'+this.name +'_rec_'+ w2utils.escapeId(record.recid)).length != 0) {
 					$('#grid_'+this.name +'_rec_'+ w2utils.escapeId(record.recid))[0].style.cssText = 
 						'height: '+ this.recordHeight +'px; ' + $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(record.recid)).attr('custom_style');
@@ -635,7 +659,7 @@
 			var eventData = this.trigger({ phase: 'before', type: 'select', target: this.name, all: true });
 			if (eventData.stop === true) return;
 			// default action
-			if (this.searchData.length == 0) { 
+			if (this.searchData.length == 0 && this.url == '') { 
 				// not searched
 				this.set({ selected: true });
 			} else { 
@@ -656,8 +680,14 @@
 			if (eventData.stop === true) return;
 			// default action
 			this.last.selected = [];
-			for (var i in this.records) if (this.records[i].selected === true) this.records[i].selected = false;
-			this.refresh();
+			for (var i in this.records) {
+				var rec = this.records[i];
+				if (rec.selected === true) {
+					rec.selected = false;
+					$('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(rec.recid)).removeClass('w2ui-selected').removeData('selected');
+					$('#grid_'+ this.name +'_cell_'+ i +'_select_check').prop("checked", false);
+				}
+			}
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
 		},
@@ -695,7 +725,7 @@
 						searchData.push(tmp);
 					}
 				}
-				if (searchData.length > 0) {
+				if (searchData.length > 0 && this.url == '') {
 					last_multi	= true;
 					last_logic  = 'AND';
 				}
@@ -721,7 +751,7 @@
 					if (typeof tmp.type == 'undefined') tmp.type = search.type;
 					if (typeof tmp.operator == 'undefined') {
 						tmp.operator = 'is';
-						if (tmp.type == 'text') tmp.operator = 'begins with';
+						if (tmp.type == 'text') tmp.operator = 'contains';
 					}
 					searchData.push(tmp);
 				}
@@ -740,7 +770,7 @@
 						var tmp = {
 							field	 : search.field,
 							type	 : search.type,
-							operator : (search.type == 'text' ? 'begins with' : 'is'),
+							operator : (search.type == 'text' ? 'contains' : 'is'),
 							value	 : value
 						};
 						searchData.push(tmp);
@@ -752,8 +782,19 @@
 							var tmp = {
 								field	 : search.field,
 								type	 : search.type,
-								operator : (search.type == 'text' ? 'begins with' : 'is'),
+								operator : (search.type == 'text' ? 'contains' : 'is'),
 								value	 : value
+							};
+							searchData.push(tmp);
+						}
+						// range in global search box 
+						if (search.type == 'int' && String(value).indexOf('-') != -1) {
+							var t = String(value).split('-');
+							var tmp = {
+								field	 : search.field,
+								type	 : search.type,
+								operator : 'between',
+								value	 : [t[0], t[1]]
 							};
 							searchData.push(tmp);
 						}
@@ -761,11 +802,11 @@
 				}
 			}
 			// event before
-			var eventData = this.trigger({ phase: 'before', type: 'search', target: this.name, searchData: searchData });
+			var eventData = this.trigger({ phase: 'before', type: 'search', target: this.name, searchData: searchData, 
+					searchField: (field ? field : 'multi'), searchValue: (value ? value : 'multi') });
 			if (eventData.stop === true) return;
 			// default action			
-			this.searchData = eventData.searchData;
-			// reset scrolling position
+			this.searchData	 = eventData.searchData;
 			this.last.field  = last_field;
 			this.last.search = last_search;
 			this.last.multi  = last_multi;
@@ -775,14 +816,16 @@
 			this.last.selected		= [];
 			// -- clear all search field
 			this.searchClose();
+			this.set({ expanded: false });
 			// apply search
 			if (this.url != '') {
-				this.page = 0;
+				this.offset = 0;
 				this.reload();
 			} else {
 				// local search
 				this.localSearch();
-				this.goto(0);
+				this.offset = 0;
+				this.refresh();
 			}
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
@@ -881,30 +924,16 @@
 			this.searchClose();
 			// apply search
 			if (this.url != '') {
-				this.page = 0;
+				this.offset = 0;
 				this.reload();
 			} else {
 				// local search
 				this.localSearch();
-				this.goto(0);
+				this.offset = 0;
+				this.refresh();
 			}
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
-		},
-
-		goto: function (newPage) {
-			var totalPages = Math.floor(this.total / this.recordsPerPage);
-			if (this.total % this.recordsPerPage != 0 || totalPages == 0) totalPages++;
-			if (totalPages < 1) totalPages = 1;
-			if (newPage < 0) newPage = 0;
-			if (newPage >= totalPages) newPage = totalPages - 1;
-			// reset scrolling position
-			this.last.scrollTop		= 0;
-			this.last.scrollLeft	= 0;
-			this.last.selected		= [];
-			// refresh items
-			this.page = newPage;
-			this.reload();
 		},
 
 		load: function (url, callBack) {
@@ -926,10 +955,9 @@
 			}
 		},
 
-		reset: function() {
-			// move to first page
-			this.page 	= 0;
+		reset: function (noRefresh) {
 			// reset last remembered state
+			this.offset 			= 0;
 			this.searchData			= [];
 			this.last.search		= '';
 			this.last.searchIds		= [];
@@ -944,9 +972,9 @@
 			// initial search panel
 			if (this.last.sortData != null ) this.sortData	 = this.last.sortData;
 			// select none without refresh
-			this.set({ selected: false });
+			this.set({ selected: false }, true);
 			// refresh
-			this.refresh();
+			if (!noRefresh) this.refresh();
 		},
 
 		request: function (cmd, add_params, url, callBack) {
@@ -958,8 +986,8 @@
 			// add list params
 			params['cmd']  	 		= cmd;
 			params['name'] 	 		= this.name;
-			params['limit']  		= this.recordsPerPage;
-			params['offset'] 		= this.page * this.recordsPerPage;
+			params['limit']  		= this.limit;
+			params['offset'] 		= this.offset;
 			params['selected'] 		= this.getSelection();
 			params['search']  		= this.searchData;
 			params['search-logic'] 	= this.last.logic;
@@ -968,36 +996,50 @@
 			$.extend(params, this.postData);
 			$.extend(params, add_params);
 			// event before
-			var eventData = this.trigger({ phase: 'before', type: 'request', target: this.name, cmd: cmd, url: url, postData: params });
-			if (eventData.stop === true) { if (typeof callBack == 'function') callBack(); return false; }
-			// default action
-			if (cmd == 'get-records') this.records = [];
+			if (cmd == 'get-records') {
+				var eventData = this.trigger({ phase: 'before', type: 'request', target: this.name, url: url, postData: params });
+				if (eventData.stop === true) { if (typeof callBack == 'function') callBack(); return false; }
+			} else {
+				var eventData = { url: this.url, postData: this.postData };
+			}
 			// call server to get data
 			var obj = this;
-			this.lock(this.msgRefresh);
+			this.lock(this.msgRefresh, true);
 			if (this.last.xhr) try { this.last.xhr.abort(); } catch (e) {};
 			var xhr_type = 'GET';
-			if (cmd == 'save-records')   	xhr_type = 'PUT';  // so far it is always update
-			if (cmd == 'delete-records') 	xhr_type = 'DELETE';
+			if (params.cmd == 'save-records')   	xhr_type = 'PUT';  // so far it is always update
+			if (params.cmd == 'delete-records') 	xhr_type = 'DELETE';
 			if (!w2utils.settings.RESTfull) xhr_type = 'POST';
+			this.last.xhr_cmd	 = params.cmd;
+			this.last.xhr_start  = (new Date()).getTime();
+			this.last.xhr_offset = this.offset;
 			this.last.xhr = $.ajax({
 				type		: xhr_type,
-				url			: eventData.url, // + (eventData.url.indexOf('?') > -1 ? '&' : '?') +'t=' + (new Date()).getTime(),
+				url			: eventData.url, 
 				data		: String($.param(eventData.postData, false)).replace(/%5B/g, '[').replace(/%5D/g, ']'),
 				dataType	: 'text',
 				complete	: function (xhr, status) {
 					obj.requestComplete(status, cmd, callBack);
 				}
 			});
-			// event after
-			this.trigger($.extend(eventData, { phase: 'after' }));
+			if (cmd == 'get-records') {
+				// event after
+				this.trigger($.extend(eventData, { phase: 'after' }));
+			}
 		},
 				
 		requestComplete: function(status, cmd, callBack) {
 			var obj = this;
 			this.unlock();
+			setTimeout(function () { $('#grid_'+ obj.name +'_footer').find('.w2ui-footer-left').html('Server Response ' + 
+					((new Date()).getTime() - obj.last.xhr_start)/1000 + ' sec'); }, 10);
+			this.last.pull_more = false;
+
 			// event before
-			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'load', xhr: this.last.xhr, status: status });
+			var event_name = 'load';
+			if (this.last.xhr_cmd == 'save-records') event_name   = 'saved';
+			if (this.last.xhr_cmd == 'delete-records') event_name = 'deleted';
+			var eventData = this.trigger({ phase: 'before', target: this.name, type: event_name, xhr: this.last.xhr, status: status });
 			if (eventData.stop === true) {
 				if (typeof callBack == 'function') callBack();
 				return false;
@@ -1025,8 +1067,25 @@
 					if (data['status'] == 'error') {
 						obj.error(data['message']);
 					} else {
-						if (cmd == 'get-records') $.extend(true, this, data);
-						if (cmd == 'delete-records') { this.reload(); return; }
+						if (cmd == 'get-records') {
+							if (this.last.xhr_offset == 0) {
+								this.records = [];
+								$.extend(true, this, data);
+								this.buffered = this.records.length;
+							} else {
+								var records = data.records;
+								delete data.records;
+								$.extend(true, this, data);
+								for (var r in records) {
+									this.records.push(records[r]);
+								}
+								this.buffered = this.records.length;
+							}
+						}
+						if (cmd == 'delete-records') { 
+							this.reload(); 
+							return;
+						}
 					}
 				}
 			} else {
@@ -1038,7 +1097,8 @@
 				this.localSearch();
 			}
 			this.trigger($.extend(eventData, { phase: 'after' }));
-			this.refresh();
+			// do not refresh if loading on infinite scroll
+			if (this.last.xhr_offset == 0) this.refresh(); else this.doScroll();
 			// call back
 			if (typeof callBack == 'function') callBack();
 		},
@@ -1098,15 +1158,17 @@
 		},
 
 		doSave: function () {
+			var obj = this;
 			var changed = this.getChanged();
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'save', changed: changed });
 			if (eventData.stop === true) return false;
 			if (this.url != '') {
-				this.request('save-records', { 'changed' : eventData.changed }, null, function () {
-				// event after
-				this.trigger($.extend(eventData, { phase: 'after' }));
-				});
+				this.request('save-records', { 'changed' : eventData.changed }, null, 
+					function () { // event after
+						obj.trigger($.extend(eventData, { phase: 'after' }));
+					}
+				);
 			} else {
 				for (var c in changed) {
 					var record = this.get(changed[c].recid);
@@ -1219,6 +1281,22 @@
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'click', recid: recid, event: event });
 			if (eventData.stop === true) return false;
+			// if it is subgrid unselect top grid
+			var parent = $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(recid)).parents('tr');
+			if (parent.length > 0 && String(parent.attr('id')).indexOf('expanded_row') != -1) {
+				var grid  = parent.parents('.w2ui-grid').attr('name');
+				w2ui[grid].selectNone();
+				// all subgrids
+				parent.parents('.w2ui-grid').find('.w2ui-expanded-row .w2ui-grid').each(function (index, el) {
+					var grid = $(el).attr('name');
+					if (w2ui[grid]) w2ui[grid].selectNone();
+				});
+			}
+			// unselect all subgrids
+			$(this.box).find('.w2ui-expanded-row .w2ui-grid').each(function (index, el) {
+				var grid = $(el).attr('name');
+				if (w2ui[grid]) w2ui[grid].selectNone();
+			});
 			// default action
 			var obj = this;
 			var sel = this.getSelection();
@@ -1231,13 +1309,13 @@
 				var sel_add = []
 				if (start <= end) {
 					for (var i = start + 1; i <= end; i++) {
-						if (this.searchData.length > 0 && $.inArray(i, this.last.searchIds) == -1) continue;
+						if (this.searchData.length > 0 && this.url == '' && $.inArray(i, this.last.searchIds) == -1) continue;
 						sel_add.push(this.records[i].recid);
 						sel.push(this.records[i].recid);
 					}
 				} else {
 					for (var i = start - 1; i >= end; i--) {
-						if (this.searchData.length > 0 && $.inArray(i, this.last.searchIds) == -1) continue;
+						if (this.searchData.length > 0 && this.url == '' && $.inArray(i, this.last.searchIds) == -1) continue;
 						sel_add.push(this.records[i].recid);
 						sel.push(this.records[i].recid);
 					}
@@ -1260,8 +1338,6 @@
 					setTimeout(function () { if (window.getSelection) window.getSelection().removeAllRanges(); }, 10);
 				}
 			}
-			// bind up/down arrows
-			if (obj.keyboard) window.w2active = obj.name;
 			if (sel.length > 0) obj.toolbar.enable('delete-selected'); else obj.toolbar.disable('delete-selected');
 			// remember last selected
 			var msgLeft = '';
@@ -1271,25 +1347,14 @@
 			}
 			$('#'+ obj.name +'_grid_footer .w2ui-footer-left').html(msgLeft);
 			obj.last.selected = sel;
-			obj.initKeyboard();
 			obj.initResize();
-		},
-
-		initKeyboard: function () {
-			// keyboard events 
-			if (this.keyboard && window.w2active == this.name) {
-				$(document)
-					.off('keydown', w2ui[window.w2active].doKeydown)
-					.on('keydown', this.doKeydown);
-			} else {
-				$(document).off('keydown', this.doKeydown);
-			}
+			// event after
+			this.trigger($.extend(eventData, { phase: 'after' }));
 		},
 
 		doKeydown: function (event) {
-			//console.log('keydown ', window.w2active, event.target.tagName, event.keyCode);
-			if (event.target && event.target.tagName != 'BODY') return;
-			var obj = w2ui[window.w2active];
+			// this method is called from w2utils
+			var obj = this;
 			// trigger event
 			var eventData = obj.trigger({ phase: 'before', type: 'keyboard', target: obj.name, event: event });	
 			if (eventData.stop === true) return false;
@@ -1324,22 +1389,36 @@
 					if (event.preventDefault) event.preventDefault();
 					break;
 				case 13: // enter
-					if (recEL.length <= 0) break;
+					if (recEL.length <= 0 || obj.show.expandColumn !== true) break;
 					obj.toggle(sel[0], event);
 					if (event.preventDefault) event.preventDefault();
 					break;
 				case 37: // left
-					if (recEL.length <= 0 || !rec.expanded) break;
+					// check if this is subgrid
+					var parent = $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(obj.records[ind].recid)).parents('tr');
+					if (parent.length > 0 && String(parent.attr('id')).indexOf('expanded_row') != -1) {
+						var recid = parent.prev().attr('recid');
+						var grid  = parent.parents('.w2ui-grid').attr('name');
+						obj.selectNone();
+						w2utils.keyboard.active(grid);
+						w2ui[grid].set(recid, { selected: true, expanded: false });
+						w2ui[grid].collapse(recid);
+						if (event.preventDefault) event.preventDefault();
+						break;
+					}
+					if (recEL.length <= 0 || rec.expanded !== true ) break;
+					obj.set(sel[0], { expanded: false }, true);
 					obj.collapse(sel[0], event);
 					if (event.preventDefault) event.preventDefault();
 					break;
 				case 39: // right
-					if (recEL.length <= 0 || rec.expanded) break;
+					if (recEL.length <= 0 || rec.expanded === true || obj.show.expandColumn !== true) break;
 					obj.expand(sel[0], event);
 					if (event.preventDefault) event.preventDefault();
 					break;
 				case 38: // up
 					if (recEL.length <= 0) break;
+					// move to the previous record
 					if ((ind > 0 && obj.last.searchIds.length == 0) || (obj.last.searchIds.length > 0 && ind > obj.last.searchIds[0])) {
 						ind--;
 						if (obj.last.searchIds.length > 0) {
@@ -1348,21 +1427,53 @@
 								ind--;
 							}
 						}
+						// jump into subgrid
+						if (obj.records[ind].expanded) {
+							var subgrid = $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(obj.records[ind].recid) +'_expanded_row').find('.w2ui-grid');
+							if (subgrid.length > 0 && w2ui[subgrid.attr('name')]) {
+								obj.selectNone();
+								var grid = subgrid.attr('name');
+								w2utils.keyboard.active(grid);
+								w2ui[grid].records[w2ui[grid].records.length-1].selected = true;
+								w2ui[grid].refresh();
+								if (event.preventDefault) event.preventDefault();
+								break;
+							}
+						}						
 						obj.selectNone();
 						obj.doClick(obj.records[ind].recid, event);
-						// scroll into view is buggy
-						// $('#grid_'+ obj.name + '_rec_' + obj.records[ind].recid).scrollintoview({ duration: 50 });
-						// if (rTop - rHeight < sTop) {
-						// 	setTimeout(function () {
-						// 		records.attr('scrollTop', rTop - rHeight * 10);
-						// 		obj.last.scrollTop = records.attr('scrollTop');
-						// 	}, 1);
-						// }
+						obj.scrollIntoView();
+						if (event.preventDefault) event.preventDefault();
+					} else {
+						// jump out of subgird (if first record)
+						var parent = $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(obj.records[ind].recid)).parents('tr');
+						if (parent.length > 0 && String(parent.attr('id')).indexOf('expanded_row') != -1) {
+							var recid = parent.prev().attr('recid');
+							var grid  = parent.parents('.w2ui-grid').attr('name');
+							obj.selectNone();
+							w2utils.keyboard.active(grid);
+							w2ui[grid].set(recid, { selected: true });
+							if (event.preventDefault) event.preventDefault();
+							break;
+						}
 					}
-					if (event.preventDefault) event.preventDefault();
 					break;
 				case 40: // down
 					if (recEL.length <= 0) break;
+					// jump into subgrid
+					if (obj.records[ind].expanded) {
+						var subgrid = $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(obj.records[ind].recid) +'_expanded_row').find('.w2ui-grid');
+						if (subgrid.length > 0 && w2ui[subgrid.attr('name')]) {
+							obj.selectNone();
+							var grid = subgrid.attr('name');
+							w2utils.keyboard.active(grid);
+							w2ui[grid].records[0].selected = true;
+							w2ui[grid].refresh();
+							if (event.preventDefault) event.preventDefault();
+							break;
+						}
+					}
+					// move to the next record
 					if ((ind + 1 < obj.records.length && obj.last.searchIds.length == 0) || (obj.last.searchIds.length > 0 && ind < obj.last.searchIds[obj.last.searchIds.length-1])) {
 						ind++;
 						if (obj.last.searchIds.length > 0) {
@@ -1373,20 +1484,36 @@
 						}
 						obj.selectNone();
 						obj.doClick(obj.records[ind].recid, event);
-						// scroll into view is buggy
-						// $('#grid_'+ obj.name + '_rec_' + obj.records[ind].recid).scrollintoview({ duration: 50 });
-						// scroll into view
-						// if (rTop + rHeight * 2 > sTop + sHeight) {
-						// 	var tmp = rTop + rHeight - sHeight + sHeight/2;
-						// 	records.attr('scrollTop', tmp).prop('scrollTop', tmp)[0].scrollTop = tmp;
-						// 	obj.last.scrollTop = tmp;
-						// }
+						obj.scrollIntoView();
+						if (event.preventDefault) event.preventDefault();
+					} else {
+						// jump out of subgrid (if last record in subgrid)
+						var parent = $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(obj.records[ind].recid)).parents('tr');
+						if (parent.length > 0 && String(parent.attr('id')).indexOf('expanded_row') != -1) {
+							var recid = parent.next().attr('recid');
+							var grid  = parent.parents('.w2ui-grid').attr('name');
+							obj.selectNone();
+							w2utils.keyboard.active(grid);
+							w2ui[grid].set(recid, { selected: true });
+							if (event.preventDefault) event.preventDefault();
+							break;
+						}
 					}
-					if (event.preventDefault) event.preventDefault();
 					break;
 			}
 			// event after
 			obj.trigger($.extend(eventData, { phase: 'after' }));
+		},
+
+		scrollIntoView: function () {
+			// scroll into view is buggy
+			// $('#grid_'+ obj.name + '_rec_' + obj.records[ind].recid).scrollintoview({ duration: 50 });
+			// if (rTop - rHeight < sTop) {
+			// 	setTimeout(function () {
+			// 		records.attr('scrollTop', rTop - rHeight * 10);
+			// 		obj.last.scrollTop = records.attr('scrollTop');
+			// 	}, 1);
+			// }
 		},
 
 		doDblClick: function (recid, event) {
@@ -1413,21 +1540,22 @@
 
 		expand: function (recid) {
 			var rec = this.get(recid);
-			var id = w2utils.escapeId(recid);
+			var obj = this;
+			var id  = w2utils.escapeId(recid);
 			if ($('#grid_'+ this.name +'_rec_'+ id +'_expanded_row').length > 0) return false;
 			// insert expand row
 			var tmp = 1 + (this.show.lineNumbers ? 1 : 0) + (this.show.selectColumn ? 1 : 0);
 			var addClass = ''; // ($('#grid_'+this.name +'_rec_'+ w2utils.escapeId(recid)).hasClass('w2ui-odd') ? 'w2ui-odd' : 'w2ui-even');
 			$('#grid_'+ this.name +'_rec_'+ id).after(
-					'<tr id="grid_'+ this.name +'_rec_'+ id +'_expanded_row" class="'+ addClass +'">'+
-					'	<td class="w2ui-grid-data" colspan="'+ tmp +'"></td>'+
-					'	<td colspan="100" class="w2ui-subgrid">'+
-					'		<div id="grid_'+ this.name +'_rec_'+ id +'_expaned">&nbsp;</div>'+
+					'<tr id="grid_'+ this.name +'_rec_'+ id +'_expanded_row" class="w2ui-expanded-row '+ addClass +'">'+
+					'	<td class="w2ui-grid-data w2ui-expanded1" colspan="'+ tmp +'"><div style="display: none"></div></td>'+
+					'	<td colspan="100" class="w2ui-expanded2">'+
+					'		<div id="grid_'+ this.name +'_rec_'+ id +'_expanded" style="opacity: 0;"></div>'+
 					'	</td>'+
 					'</tr>');
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'expand', target: this.name, recid: recid, 
-				box_id: 'grid_'+ this.name +'_rec_'+ id +'_expaned' });
+				box_id: 'grid_'+ this.name +'_rec_'+ id +'_expanded', ready: ready });
 			if (eventData.stop === true) { 	
 				$('#grid_'+ this.name +'_rec_'+ id +'_expanded_row').remove(); 
 				return false; 
@@ -1435,32 +1563,47 @@
 			// default action
 			$('#grid_'+ this.name +'_rec_'+ id).attr('expanded', 'yes')
 			$('#grid_'+ this.name +'_rec_'+ id +'_expanded_row').show();
-			$('#grid_'+ this.name +'_cell_'+ this.get(recid, true) +'_expand div').html('-');
+			$('#grid_'+ this.name +'_cell_'+ this.get(recid, true) +'_expand div').html('<div class="w2ui-spinner" style="width: 16px; margin: -2px 2px;"></div>');
 			rec.expanded = true;
+			// check if height of expaned row > 5 then remove spinner
+			setTimeout(ready, 300);
+			function ready() {
+				var div1 = $('#grid_'+ obj.name +'_rec_'+ id +'_expanded');
+				var div2 = $('#grid_'+ obj.name +'_rec_'+ id +'_expanded_row .w2ui-expanded1 > div');
+				if (div1.height() < 5) return;
+				div1.css('opacity', 1);
+				div2.show();
+				$('#grid_'+ obj.name +'_cell_'+ obj.get(recid, true) +'_expand div').html('-');				
+			}
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
-			this.initKeyboard();
 			this.resizeRecords();
 			return true;
 		},
 
 		collapse: function (recid) {
 			var rec = this.get(recid);
-			var id = w2utils.escapeId(recid);
+			var obj = this;
+			var id  = w2utils.escapeId(recid);
 			if ($('#grid_'+ this.name +'_rec_'+ id +'_expanded_row').length == 0) return false;
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'collapse', target: this.name, recid: recid,
-				box_id: 'grid_'+ this.name +'_rec_'+ id +'_expaned' });
+				box_id: 'grid_'+ this.name +'_rec_'+ id +'_expanded' });
 			if (eventData.stop === true) return false; 
 			// default action
 			$('#grid_'+ this.name +'_rec_'+ id).removeAttr('expanded');
-			$('#grid_'+ this.name +'_rec_'+ id +'_expanded_row').remove();
+			$('#grid_'+ this.name +'_rec_'+ id +'_expanded').css('opacity', 0);
 			$('#grid_'+ this.name +'_cell_'+ this.get(recid, true) +'_expand div').html('+');
-			delete rec.expanded;
-			// event after
-			this.trigger($.extend(eventData, { phase: 'after' }));
-			this.initKeyboard();
-			this.resizeRecords();
+			setTimeout(function () {
+				$('#grid_'+ obj.name +'_rec_'+ id +'_expanded').height('0px');
+				setTimeout(function () {
+					$('#grid_'+ obj.name +'_rec_'+ id +'_expanded_row').remove();
+					delete rec.expanded;
+					// event after
+					obj.trigger($.extend(eventData, { phase: 'after' }));
+					obj.resizeRecords();
+				}, 300);
+			}, 200);
 			return true;
 		},
 
@@ -1504,7 +1647,8 @@
 				this.refresh();
 			} else {
 				// event after
-				this.trigger($.extend(eventData, { phase: 'after' }));				
+				this.trigger($.extend(eventData, { phase: 'after' }));
+				this.offset = 0;
 				this.reload();
 			}
 		},
@@ -1543,9 +1687,7 @@
 			var time = (new Date()).getTime();
 			// if over the max page, then go to page 1
 			if (this.total < 0) this.total = this.records.length;
-			var totalPages = Math.floor(this.total / this.recordsPerPage);
-			if (this.total % this.recordsPerPage != 0 || totalPages == 0) totalPages++;
-			if (this.page > 0 && this.page > totalPages-1) this.goto(0);
+			if (this.buffered <= 0 && this.url == '') this.buffered = this.total; 
 
 			if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
 			if (!this.box) return;
@@ -1663,12 +1805,17 @@
 			// send expand events
 			var rows = obj.find({ expanded: true });
 			for (var r in rows) {
-				var eventData = this.trigger({ phase: 'before', type: 'expand', target: this.name, recid: rows[r], 
-					box_id: 'grid_'+ this.name +'_rec_'+ w2utils.escapeId(rows[r]) +'_expaned' });
-				if (eventData.stop === true) return false; 
+				var eventData2 = this.trigger({ phase: 'before', type: 'expand', target: this.name, recid: rows[r], 
+					box_id: 'grid_'+ this.name +'_rec_'+ w2utils.escapeId(rows[r]) +'_expanded' });
+				if (eventData2.stop === true) return false; 
 				// event after
-				this.trigger($.extend(eventData, { phase: 'after' }));
+				this.trigger($.extend(eventData2, { phase: 'after' }));
 			}
+			// mark selection
+			setTimeout(function () {
+				var str  = $.trim($('#grid_'+ obj.name +'_search_all').val());
+				if (str != '') $(obj.box).find('.w2ui-grid-data > div').w2marker(str);
+			}, 50);
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
 			obj.resize(); 
@@ -1716,8 +1863,10 @@
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
 			// attach to resize event
-			this.tmp_resize = function (event) { w2ui[obj.name].resize(); }
-			$(window).off('resize', this.tmp_resize).on('resize', this.tmp_resize);
+			if ($('.w2ui-layout').length == 0) { // if there is layout, it will send a resize event
+				this.tmp_resize = function (event) { w2ui[obj.name].resize(); }
+				$(window).off('resize', this.tmp_resize).on('resize', this.tmp_resize);
+			}
 			return (new Date()).getTime() - time;
 		},
 
@@ -1727,7 +1876,6 @@
 			if (eventData.stop === true) return false;
 			// remove events
 			$(window).off('resize', this.tmp_resize);
-			$(document).off('keydown', this.doKeydown);
 			// clean up
 			if (typeof this.toolbar == 'object' && this.toolbar.destroy) this.toolbar.destroy();
 			if ($(this.box).find('#grid_'+ this.name +'_body').length > 0) {
@@ -1840,13 +1988,15 @@
 
 				var obj = this;
 				this.toolbar.on('click', function (id, data) {
+					var eventData = obj.trigger({ phase: 'before', type: 'toolbar', target: id, data: data });
+					if (eventData.stop === true) return false;
 					switch (id) {
 						case 'reload':
-							var eventData = obj.trigger({ phase: 'before', type: 'reload', target: obj.name });
-							if (eventData.stop === true) return false;
-							obj.reset();
+							var eventData2 = obj.trigger({ phase: 'before', type: 'reload', target: obj.name });
+							if (eventData2.stop === true) return false;
+							obj.reset(true);
 							obj.reload();
-							obj.trigger({ phase: 'after' });
+							obj.trigger($.extend(eventData2, { phase: 'after' }));
 							break;
 						case 'column-on-off':
 							for (var c in obj.columns) {
@@ -1891,6 +2041,8 @@
 							obj.doSave();
 							break;
 					}
+					// no default action
+					obj.trigger($.extend(eventData, { phase: 'after' }));
 				});
 			}
 			return;
@@ -2102,14 +2254,14 @@
 			if (bodyOverflowX || bodyOverflowY) {
 				columns.find('> table > tbody > tr:nth-child(1) td.w2ui-head-last').css('width', w2utils.sbSize()).show();
 				records.css({ 
-					top: ((this.columnGroups.length > 0 ? 1 : 0) + w2utils.getSize(columns, 'height')) +'px',
+					top: ((this.columnGroups.length > 0 && this.show.columns ? 1 : 0) + w2utils.getSize(columns, 'height')) +'px',
 					"-webkit-overflow-scrolling": "touch",
 					"overflow-x": (bodyOverflowX ? 'auto' : 'hidden'), 
 					"overflow-y": (bodyOverflowY ? 'auto' : 'hidden') });
 			} else {
 				columns.find('> table > tbody > tr:nth-child(1) td.w2ui-head-last').hide();
 				records.css({ 
-					top: ((this.columnGroups.length > 0 ? 1 : 0) + w2utils.getSize(columns, 'height')) +'px', 
+					top: ((this.columnGroups.length > 0 && this.show.columns ? 1 : 0) + w2utils.getSize(columns, 'height')) +'px', 
 					overflow: 'hidden' 
 				});
 				if (records.length > 0) { this.last.scrollTop  = 0; this.last.scrollLeft = 0; } // if no scrollbars, always show top
@@ -2117,7 +2269,7 @@
 			if (this.show.emptyRecords && !bodyOverflowY) {
 				var max = Math.floor(records.height() / this.recordHeight) + 1;
 				if (this.fixedBody) {
-					for (var di = this.total; di <= max; di++) {
+					for (var di = this.buffered; di <= max; di++) {
 						var html  = '';
 						html += '<tr class="'+ (di % 2 ? 'w2ui-even' : 'w2ui-odd') + ' w2ui-empty-record" style="height: '+ this.recordHeight +'">';
 						if (this.show.lineNumbers)  html += '<td class="w2ui-col-number"></td>';
@@ -2398,7 +2550,7 @@
 						if (col.resizable == true) {
 							resizer = '<div class="w2ui-resizer" name="'+ ii +'"></div>';
 						}
-						html += '<td class="w2ui-head" col="'+ ii + '" rowspan="2" colspan="'+ (colg.span + (i == obj.columnGroups.length-1 ? 1 : 0) ) +'" '+
+						html += '<td class="w2ui-head '+ sortStyle +'" col="'+ ii + '" rowspan="2" colspan="'+ (colg.span + (i == obj.columnGroups.length-1 ? 1 : 0) ) +'" '+
 										(col.sortable ? 'onclick="w2ui[\''+ obj.name +'\'].doSort(\''+ col.field +'\', null, event);"' : '') +'>'+
 									resizer +
 								'	<div class="w2ui-col-group '+ sortStyle +'">'+
@@ -2466,7 +2618,7 @@
 						if (col.resizable == true) {
 							resizer = '<div class="w2ui-resizer" name="'+ i +'"></div>';
 						}
-						html += '<td col="'+ i +'" class="w2ui-head" '+
+						html += '<td col="'+ i +'" class="w2ui-head '+ sortStyle +'" '+
 										(col.sortable ? 'onclick="w2ui[\''+ obj.name +'\'].doSort(\''+ col.field +'\', null, event);"' : '') + '>'+
 									resizer +
 								'	<div class="'+ sortStyle +'">'+  
@@ -2483,10 +2635,10 @@
 
 		getRecordsHTML: function () {
 			this.show_extra = 30;	// larget number works better with chrome, smaller with FF.
-			if (this.total <= 300) this.show_extra = 300;
+			if (this.buffered <= 300) this.show_extra = 300;
 			var records	= $('#grid_'+ this.name +'_records');
 			var limit	= Math.floor(records.height() / this.recordHeight) + this.show_extra + 1;
-			if (!this.fixedBody) limit = this.total;
+			if (!this.fixedBody) limit = this.buffered;
 			// always need first record for resizing purposes
 			var html = '<table>' + this.getRecordHTML(-1, 0);
 			// first empty row with height
@@ -2496,7 +2648,7 @@
 			for (var i = 0; i < limit; i++) {
 				html += this.getRecordHTML(i, i+1);
 			}
-			html += '<tr id="grid_'+ this.name + '_rec_bottom" line="bottom" style="height: '+ ((this.total - limit) * this.recordHeight) +'px">'+
+			html += '<tr id="grid_'+ this.name + '_rec_bottom" line="bottom" style="height: '+ ((this.buffered - limit) * this.recordHeight) +'px">'+
 					'	<td colspan="200"></td>'+
 					'</tr>'+
 					'</table>';
@@ -2517,17 +2669,19 @@
 
 		doScroll: function (event) {
 			var time = (new Date()).getTime();
+			var obj  = this;
 			var records	= $('#grid_'+ this.name +'_records');
 			if (records.length == 0) return;
 			// update footer
 			var t1 = Math.floor(records[0].scrollTop / this.recordHeight + 1);
 			var t2 = Math.floor(records[0].scrollTop / this.recordHeight + 1) + Math.floor(records.height() / this.recordHeight);
-			if (t1 > this.total) t1 = this.total;
-			if (t2 > this.total) t2 = this.total;
+			if (t1 > this.buffered) t1 = this.buffered;
+			if (t2 > this.buffered) t2 = this.buffered;
 			$('#grid_'+ this.name + '_footer .w2ui-footer-right').html(
 				String(t1).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,") + '-' + 
 				String(t2).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,") + ' of ' + 
-				String(this.total).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,")
+				String(this.total).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,") +
+				(this.url != '' ? ' (buffered '+ String(this.buffered).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,") + ')' : '')
 			);
 			if (!this.fixedBody || this.total <= 300) return;
 			// regular processing
@@ -2545,7 +2699,7 @@
 			var last  = parseInt(tr2.prev().attr('line'));
 			//console.log('show: ' + start + '-'+ end + ' ===> current: ' + first + '-' + last);
 			if (first < start || first == 1) { // scroll down
-				if (end <= last + this.show_extra && end < this.total) return;
+				if (end <= last + this.show_extra && end < this.buffered) return;
 				// remove from top
 				while (true) {
 					var tmp = records.find('#grid_'+ this.name +'_rec_top').next();
@@ -2559,6 +2713,17 @@
 				for (var i = parseInt(rec_start) + 1; i <= end; i++) {
 					tr2.before(this.getRecordHTML(i-1, i));
 				}
+				// mark search
+				clearTimeout(obj.last.marker_timer);
+				obj.last.marker_timer = setTimeout(function () {
+					// mark all search strings
+					var str = [];
+					for (var s in obj.searchData) {
+						var tmp = obj.searchData[s];
+						if ($.inArray(tmp.value, str) == -1) str.push(tmp.value);
+					}
+					if (str.length > 0) $(obj.box).find('.w2ui-grid-data > div').w2marker(str);
+				}, 50);
 			} else { // scroll up
 				if (start >= first - this.show_extra && start > 1) return;
 				// remove from bottom
@@ -2574,15 +2739,29 @@
 				for (var i = parseInt(rec_start) - 1; i >= start; i--) {
 					tr1.after(this.getRecordHTML(i-1, i));
 				}
+				// mark search
+				clearTimeout(obj.last.marker_timer);
+				obj.last.marker_timer = setTimeout(function () {
+					var str  = $.trim($('#grid_'+ obj.name +'_search_all').val());
+					if (str != '') $(obj.box).find('.w2ui-grid-data > div').w2marker(str);
+				}, 50);
 			}
 			// first/last row size
 			var h1 = (start - 1) * this.recordHeight;
-			var h2 = (this.total - end) * this.recordHeight;
+			var h2 = (this.buffered - end) * this.recordHeight;
 			if (h2 < 0) h = 0;
 			tr1.css('height', h1 + 'px');
 			tr2.css('height', h2 + 'px');
 			this.last.range_start = start;
 			this.last.range_end   = end;
+			// load more if needed
+			var s = Math.floor(records[0].scrollTop / this.recordHeight);
+			var e = s + Math.floor(records.height() / this.recordHeight);
+			if (e + 10 > this.buffered && this.last.pull_more !== true && this.buffered < this.total) {
+				this.last.pull_more = true;
+				this.offset += this.limit;
+				this.request('get-records');
+			}
 			return;
 		},
 
@@ -2591,20 +2770,20 @@
 			// first record needs for resize purposes
 			if (ind == -1) {
 				rec_html += '<tr line="0">';
-				if (this.show.lineNumbers) rec_html  += '<td class="w2ui-col-number" style="height: 1px;"></td>';
-				if (this.show.selectColumn) rec_html += '<td class="w2ui-col-select" style="height: 1px;"></td>';
-				if (this.show.expandColumn) rec_html += '<td class="w2ui-col-expand" style="height: 1px;"></td>';
+				if (this.show.lineNumbers) rec_html  += '<td class="w2ui-col-number" style="height: 0px;"></td>';
+				if (this.show.selectColumn) rec_html += '<td class="w2ui-col-select" style="height: 0px;"></td>';
+				if (this.show.expandColumn) rec_html += '<td class="w2ui-col-expand" style="height: 0px;"></td>';
 				for (var i in this.columns) {
 					if (this.columns[i].hidden) continue;
-					rec_html += '<td class="w2ui-grid-data" col="'+ i +'" style="height: 1px;"></td>';					
+					rec_html += '<td class="w2ui-grid-data" col="'+ i +'" style="height: 0px;"></td>';					
 				}
-				rec_html += '<td class="w2ui-grid-data-last" style="height: 1px;"></td>';
+				rec_html += '<td class="w2ui-grid-data-last" style="height: 0px;"></td>';
 				rec_html += '</tr>';
 				return rec_html;
 			}
 			// regular record
 			if (summary !== true) {
-				if (this.searchData.length > 0) {
+				if (this.searchData.length > 0 && this.url == '') {
 					if (ind >= this.last.searchIds.length) return '';
 					ind = this.last.searchIds[ind];
 					record = this.records[ind]; 
@@ -2618,7 +2797,8 @@
 			}
 			var id = w2utils.escapeId(record.recid);
 			if (record.selected) {
-				rec_html += '<tr id="grid_'+ this.name +'_rec_'+ record.recid +'" recid="'+ record.recid +'" line="'+ lineNum +'" class="w2ui-selected" ' +
+				rec_html += '<tr id="grid_'+ this.name +'_rec_'+ record.recid +'" recid="'+ record.recid +'" line="'+ lineNum +'" '+
+						' class="w2ui-selected '+ (lineNum % 2 == 0 ? 'w2ui-even' : 'w2ui-odd') + '" ' +
 						(summary !== true ?
 							(this.isIOS ?
 								'	onclick  = "w2ui[\''+ this.name +'\'].doDblClick(\''+ record.recid +'\', event);" '
@@ -2667,13 +2847,17 @@
 						'</td>';
 			}
 			if (this.show.expandColumn) {
+				var tmp_img = '';
+				if (record.expanded === true)  tmp_img = '-'; else tmp_img = '+';
+				if (record.expanded == 'none') tmp_img = '';
+				if (record.expanded == 'spinner') tmp_img = '<div class="w2ui-spinner" style="width: 16px; margin: -2px 2px;"></div>';
 				rec_html += 
 						'<td id="grid_'+ this.name +'_cell_'+ ind +'_expand" valign="top" class="w2ui-grid-data w2ui-col-expand">'+
 							(summary !== true ?
 							'	<div ondblclick="if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;" '+
 							'			onclick="w2ui[\''+ this.name +'\'].toggle(\''+ record.recid +'\', event); '+
 							'				if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;">'+
-							'		'+ (record.expanded ? '-' : '+') +' </div>'
+							'		'+ tmp_img +' </div>'
 							: 
 							'' ) +
 						'</td>';
@@ -2737,51 +2921,29 @@
 			rec_html += '<td class="w2ui-grid-data-last"></td>';
 			rec_html += '</tr>';
 			// if row is expanded
-			if (record.expanded) {
+			if (record.expanded === true && $('#grid_'+ this.name +'_rec_'+ record.recid +'_expanded_row').length == 0) {
 				var tmp = 1 + (this.show.lineNumbers ? 1 : 0) + (this.show.selectColumn ? 1 : 0);
 				rec_html += 
 					'<tr id="grid_'+ this.name +'_rec_'+ record.recid +'_expanded_row">'+
-					'	<td class="w2ui-grid-data" colspan="'+ tmp +'"></td>'+
-					'	<td colspan="100" class="w2ui-subgrid">'+
-					'		<div id="grid_'+ this.name +'_rec_'+ record.recid +'_expaned">&nbsp;</div>'+
+					'	<td class="w2ui-grid-data w2ui-expanded1" colspan="'+ tmp +'"><div></div></td>'+
+					'	<td colspan="100" class="w2ui-expanded2">'+
+					'		<div id="grid_'+ this.name +'_rec_'+ record.recid +'_expanded">&nbsp;</div>'+
 					'	</td>'+
 					'</tr>';
 			}
+			//console.log('getHTML', ind);
 			return rec_html;
 		},
 
 		getFooterHTML: function () {
-			// counts
-			var last = (this.page * this.recordsPerPage + this.recordsPerPage);
-			if (last > this.total) last = this.total;
-			var pageCountDsp = (this.page * this.recordsPerPage + 1) +'-'+ String(last).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,") + ' ' + 
-				w2utils.lang('of') +' '+ String(this.total).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,");
-			if (this.page == 0 && this.total == 0) pageCountDsp = '0-0 '+ w2utils.lang('of') +' 0';
-			// pages
-			var totalPages = Math.floor(this.total / this.recordsPerPage);
-			if (this.total % this.recordsPerPage != 0 || totalPages == 0) totalPages++;
-			if (totalPages < 1) totalPages = 1;
-			var pages = '<div class="w2ui-footer-nav">'+
-				 '		<a class="w2ui-footer-btn" '+
-				 '  		onclick="w2ui[\''+ this.name +'\'].goto(w2ui[\''+ this.name +'\'].page - 1)" '+ (this.page == 0 ? 'disabled' : '') +
-				 '		> << </a>'+
-				 '		<input type="text" value="'+ (this.page + 1) +'" '+
-				 '			onclick="this.select();" '+
-				 '			onkeyup="if (event.keyCode != 13) return; '+
-				 '					 if (this.value < 1 || !w2utils.isInt(this.value)) this.value = 1; '+
-				 '					 w2ui[\''+ this.name +'\'].goto(parseInt(this.value-1)); ">'+
-				 '		<a class="w2ui-footer-btn" '+
-				 '  		onclick="w2ui[\''+ this.name +'\'].goto(w2ui[\''+ this.name +'\'].page + 1)" '+ (this.page == totalPages-1 || totalPages == 0 ? 'disabled' : '') +
-				 '		> >> </a>'+
-				 '</div>';
 			return '<div>'+
 				'	<div class="w2ui-footer-left"></div>'+
-				'	<div class="w2ui-footer-right">'+ pageCountDsp +'</div>'+
-				'	<div class="w2ui-footer-center">'+ pages +'</div>'+
+				'	<div class="w2ui-footer-right">'+ this.buffered +'</div>'+
+				'	<div class="w2ui-footer-center"></div>'+
 				'</div>';
 		},
 
-		lock: function (msg) {
+		lock: function (msg, showSpinner) {
 			var obj = this;
 			if (typeof msg == 'undefined' || msg == '') {
 				setTimeout(function () {
@@ -2810,6 +2972,7 @@
 							width 	: '100%',
 							height 	: '100%'
 						});
+						if (showSpinner === true) msg = '<div style="display: inline-block; width: 24px; height: 24px; margin: -3px 8px -7px -10px;" class="w2ui-spinner"></div>' + msg;
 						status.html(msg).css({
 							opacity : status.data('old_opacity'),
 							left	: left + 'px',
@@ -2825,10 +2988,15 @@
 		},
 
 		parseObj: function (obj, field) {
-			var tmp = String(field).split('.');
-			var val = obj;
-			for (var i in tmp) {
-				val = val[tmp[i]];
+			var val = '';
+			try { // need this to make sure no error in fields
+				val = obj;
+				var tmp = String(field).split('.');
+				for (var i in tmp) {
+					val = val[tmp[i]];
+				}
+			} catch (event) {
+				val = '';
 			}
 			return val;
 		}

@@ -10,8 +10,8 @@
 *
 * == 1.3 Changes ==
 *	- animated open/close
-*	- add keyboard property
 *	- added onKeyboard event
+*	- moved some settings to prototype
 *
 ************************************************************************/
 
@@ -21,14 +21,13 @@
 		this.box 			= null;
 		this.sidebar		= null;
 		this.parent 		= null;
+		this.nodes	 		= []; 	// Sidebar child nodes
+		this.selected 		= null;	// current selected node (readonly)
 		this.img 			= null;
 		this.icon 			= null;
-		this.style	 		= '';
-		this.selected 		= null;	// current selected node (readonly)
-		this.nodes	 		= []; 	// Sidebar child nodes
+		this.style			= '';
 		this.topHTML		= '';
-		this.bottomHTML     = '';
-		this.keyboard		= true;
+		this.bottomHTML  	= '';
 		this.onClick		= null;	// Fire when user click on Node Text
 		this.onDblClick		= null;	// Fire when user dbl clicks
 		this.onContextMenu	= null;	
@@ -40,7 +39,7 @@
 		this.onResize 		= null;
 		this.onDestroy	 	= null;
 	
-		$.extend(true, this, options);
+		$.extend(true, this, options, w2obj.sidebar);
 	}
 	
 	// ====================================================
@@ -89,6 +88,7 @@
 	// -- Implementation of core functionality
 	
 	w2sidebar.prototype = {
+
 		node: {
 			id	 			: null,
 			text	   		: '',
@@ -403,23 +403,15 @@
 					.find('.w2ui-icon').addClass('w2ui-icon-selected');
 				nd.selected = true;
 				this.selected = id;
-				// bind up/down arrows
-				if (this.keyboard) {
-					if (typeof window.w2active != 'undefined') $(document).off('keydown', w2ui[window.w2active].doKeydown)
-					$(document).on('keydown', this.doKeydown);
-					window.w2active = this.name;
-				} else {
-					$(document).off('keydown', this.doKeydown);
-				}
 			}
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
 		},
 		
 		doKeydown: function (event) {
-			if (event.target && event.target.tagName != 'BODY') return;
-			var obj = w2ui[window.w2active];
+			var obj = this;
 			var nd  = obj.get(obj.selected);
+			if (!nd) return;
 			// trigger event
 			var eventData = obj.trigger({ phase: 'before', type: 'keyboard', target: obj.name, event: event });	
 			if (eventData.stop === true) return false;
@@ -649,8 +641,6 @@
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'destroy', target: this.name });	
 			if (eventData.stop === true) return false;
-			// remove events
-			$(document).off('keydown', this.doKeydown);
 			// clean up
 			if ($(this.box).find('> div > div.w2ui-sidebar-div').length > 0) {
 				$(this.box)

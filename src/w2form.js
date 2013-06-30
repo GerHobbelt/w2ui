@@ -12,6 +12,8 @@
 * == 1.3 changes ==
 *   - tabs can be array of string, array of tab objects or w2tabs object
 * 	- generate should use fields, and not its own structure
+*	- added submit() as alias of save()
+*	- moved some settings to prototype
 *
 ************************************************************************/
 
@@ -33,6 +35,7 @@
 		this.original   	= {};
 		this.postData		= {};
 		this.tabs 			= {}; 		// if not empty, then it is tabs object
+
 		this.style 			= '';
 		this.focusFirst		= true;
 		this.msgNotJSON 	= w2utils.lang('Return data is not in JSON format.');
@@ -40,11 +43,11 @@
 		this.msgSaving		= w2utils.lang('Saving...');
 
 		// events
-		this.onRequest  	= null,
-		this.onLoad 		= null,
-		this.onSubmit		= null,
-		this.onSave			= null,
-		this.onChange		= null,
+		this.onRequest  	= null;
+		this.onLoad 		= null;
+		this.onSubmit		= null;
+		this.onSave			= null;
+		this.onChange		= null;
 		this.onRender 		= null;
 		this.onRefresh		= null;
 		this.onResize 		= null;
@@ -58,7 +61,7 @@
 			xhr	: null		// jquery xhr requests
 		}
 
-		$.extend(true, this, options);
+		$.extend(true, this, options, w2obj.form);
 	};
 	
 	// ====================================================
@@ -436,6 +439,10 @@
 			this.trigger($.extend(eventData, { phase: 'after' }));
 		},
 
+		submit: function (postData, callBack) {
+			return this.save(postData, callBack);
+		},
+
 		save: function (postData, callBack) {
 			var obj = this;
 			// check for multiple params
@@ -771,14 +778,8 @@
 					case 'date':
 						if (!field.options) field.options = {};
 						if (!field.options.format) field.options.format = 'mm/dd/yyyy';
-						if (field.options.format.toLowerCase() == 'dd/mm/yyyy' || field.options.format.toLowerCase() == 'dd-mm-yyyy'
-								|| field.options.format.toLowerCase() == 'dd.mm.yyyy') {
-							var tmp = value.replace(/-/g, '/').replace(/\./g, '/').split('/');
-							field.el.value = w2utils.formatDate(tmp[2]+'-'+tmp[1]+'-'+tmp[0], field.options.format);
-						} else {
-							field.el.value = w2utils.formatDate(value, field.options.format);
-						}
-						this.record[field.name] = field.el.value;
+						field.el.value = value;
+						this.record[field.name] = value;
 						$(field.el).w2field($.extend({}, field.options, { type: 'date' }));
 						break;
 					case 'int':
@@ -888,8 +889,10 @@
 				this.refresh();
 			}
 			// attach to resize event
-			this.tmp_resize = function (event) { w2ui[obj.name].resize(); }
-			$(window).off('resize', 'body').on('resize', 'body', this.tmp_resize);
+			if ($('.w2ui-layout').length == 0) { // if there is layout, it will send a resize event
+				this.tmp_resize = function (event) { w2ui[obj.name].resize(); }
+				$(window).off('resize', 'body').on('resize', 'body', this.tmp_resize);
+			}
 			setTimeout(function () { obj.resize(); obj.refresh(); }, 150); // need timer because resize is on timer
 			// focus first
 			function focusFirst() {
