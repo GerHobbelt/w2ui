@@ -1018,7 +1018,6 @@ w2utils.keyboard = (function (obj) {
 *	- column autosize based on largest content
 *	- more events in editable fields (onkeypress)
 * 	- move record with keyboard, grid does not follow
-*	- select group then click anywhere: record style is broken
 *
 * == 1.3 changes ==
 *	- added getRecordHTML, refactored, updated set()
@@ -3728,6 +3727,11 @@ w2utils.keyboard = (function (obj) {
 			var obj  = this;
 			var records	= $('#grid_'+ this.name +'_records');
 			if (records.length == 0) return;
+			// need this to enable scrolling when this.limit < then a screen can fit
+			if (records.height() < this.buffered * this.recordHeight && records.css('overflow-y') == 'hidden') {
+				this.refresh();
+				return;
+			}
 			// update footer
 			var t1 = Math.floor(records[0].scrollTop / this.recordHeight + 1);
 			var t2 = Math.floor(records[0].scrollTop / this.recordHeight + 1) + Math.floor(records.height() / this.recordHeight);

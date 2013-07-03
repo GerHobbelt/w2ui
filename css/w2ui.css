@@ -962,7 +962,6 @@ select {
   height: 100%;
   margin: 0px;
   padding: 0px;
-  /* border-top: 1px solid #b2bac0; */
 }
 .w2ui-grid .w2ui-grid-body .w2ui-grid-records .w2ui-expanded2 {
   height: 0px;
@@ -973,7 +972,6 @@ select {
   height: 0px;
   border: 0px;
   transition: height .3s, opacity .3s;
-  /* border-top: 1px solid #b2bac0; */
 }
 .w2ui-grid .w2ui-grid-body table {
   border-spacing: 0px;
