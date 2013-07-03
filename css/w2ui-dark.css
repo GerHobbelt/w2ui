@@ -967,16 +967,19 @@ select {
   color: #eeeeee !important;
   background-color: #292f3c !important;
 }
+.w2ui-grid .w2ui-grid-body .w2ui-grid-records .w2ui-expanded {
+  background-color: #CCDCF0 !important;
+}
 .w2ui-grid .w2ui-grid-body .w2ui-grid-records .w2ui-expanded1 {
   height: 0px;
   border-bottom: 1px solid #b2bac0;
-  background-color: #e2eff8;
+  background-color: #CCDCF0;
 }
 .w2ui-grid .w2ui-grid-body .w2ui-grid-records .w2ui-expanded1 > div {
   height: 100%;
   margin: 0px;
   padding: 0px;
-  border-top: 1px solid #b2bac0;
+  /* border-top: 1px solid #b2bac0; */
 }
 .w2ui-grid .w2ui-grid-body .w2ui-grid-records .w2ui-expanded2 {
   height: 0px;
@@ -985,9 +988,9 @@ select {
 }
 .w2ui-grid .w2ui-grid-body .w2ui-grid-records .w2ui-expanded2 > div {
   height: 0px;
-  transition: height .3s, opacity .3s;
   border: 0px;
-  border-top: 1px solid #b2bac0;
+  transition: height .3s, opacity .3s;
+  /* border-top: 1px solid #b2bac0; */
 }
 .w2ui-grid .w2ui-grid-body table {
   border-spacing: 0px;
@@ -1126,11 +1129,11 @@ select {
   text-align: center;
   height: 24px;
   overflow: hidden;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  -o-user-select: none;
-  user-select: none;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  -o-user-select: text;
+  user-select: text;
   box-shadow: 0px -1px 4px #333333;
   color: #c0c8d5;
   background-color: #404960;
@@ -1218,7 +1221,7 @@ select {
   padding: 3px 15px 3px 3px;
 }
 .w2ui-overlay .w2ui-col-on-off {
-  padding: 2px 0px;
+  padding: 4px 0px;
 }
 .w2ui-overlay .w2ui-col-on-off table {
   border-spacing: 0px;
@@ -1227,9 +1230,6 @@ select {
 .w2ui-overlay .w2ui-col-on-off table tr:hover {
   background-color: #292f3c;
 }
-.w2ui-overlay .w2ui-col-on-off table td {
-  padding: 3px 3px 3px 6px;
-}
 .w2ui-overlay .w2ui-col-on-off table td input[type=checkbox] {
   margin: 3px 2px 2px 2px;
 }
@@ -1237,6 +1237,12 @@ select {
   display: block;
   padding: 3px 0px;
   padding-right: 10px;
+}
+.w2ui-overlay .w2ui-col-on-off table td:first-child {
+  padding: 4px 0px 4px 6px;
+}
+.w2ui-overlay .w2ui-col-on-off table td:last-child {
+  padding: 4px 6px 4px 0px;
 }
 .w2ui-overlay .w2ui-grid-searches {
   text-align: left;
