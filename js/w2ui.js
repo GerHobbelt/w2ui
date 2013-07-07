@@ -17,7 +17,8 @@ var w2obj = w2obj || {}; // expose object to be able to overwrite default functi
 *	- added locale(..., callBack), fixed bugs
 *	- each widget has name in the box that is name of widget, $(name).w2grid('resize');
 *	- added $().w2marker('string')
-*	- added w2utils.keyboard
+*	- added w2utils.keyboard module
+*	- added w2utils.format()
 *
 ************************************************/
 
@@ -47,8 +48,9 @@ var w2utils = (function () {
 		isTime			: isTime,
 		size 			: size,
 		age 			: age,
-		formatDate		: formatDate,
 		date 			: date,
+		formatDate		: formatDate,
+		format			: format,
 		stripTags		: stripTags,
 		encodeTags		: encodeTags,
 		escapeId		: escapeId,
@@ -56,7 +58,7 @@ var w2utils = (function () {
 		base64decode	: base64decode,
 		transition		: transition,
 		getSize			: getSize,
-		sbSize			: sbSize,
+		scrollBarSize	: scrollBarSize,
 		lang 			: lang,
 		locale	 		: locale
 	}
@@ -154,6 +156,14 @@ var w2utils = (function () {
 						.replace('month', fullMonths[month]);
 		return res;
 	}
+
+	function format (numStr) {
+		var ret = '';
+		if (w2utils.isFloat(numStr) || w2utils.isInt(numStr) || w2utils.isMoney(numStr)) {
+			ret = String(numStr).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,");
+		}
+		return ret;
+	}
 	
 	function date (dateStr) {
 		var months = w2utils.settings.shortmonths;
@@ -205,6 +215,7 @@ var w2utils = (function () {
 		if (sec < 60) {
 			amount = Math.floor(sec);
 			type   = 'sec';
+			if (sec < 0) { amount = 0; type = 'sec' }
 		} else if (sec < 60*60) {
 			amount = Math.floor(sec/60);
 			type   = 'min';
@@ -212,13 +223,13 @@ var w2utils = (function () {
 			amount = Math.floor(sec/60/60);
 			type   = 'hour';
 		} else if (sec < 30*24*60*60) {
-			amount = Math.floor(sec/24/60/60);
+			amount = Math.floor(sec/24/60/60*10)/10;
 			type   = 'day';
 		} else if (sec < 12*30*24*60*60) {
-			amount = Math.floor(sec/30/24/60/60);
+			amount = Math.floor(sec/30/24/60/60*10)/10;
 			type   = 'month';
 		} else if (sec >= 12*30*24*60*60) {
-			amount = Math.floor(sec/12/30/24/60/60);
+			amount = Math.floor(sec/12/30/24/60/60*10)/10;
 			type   = 'year';
 		}		
 		return amount + ' ' + type + (amount > 1 ? 's' : '');
@@ -670,15 +681,15 @@ var w2utils = (function () {
 		});
 	}
 
-	function sbSize () {
-		if (w2utils._sbSize) return w2utils._sbSize; 
+	function scrollBarSize () {
+		if (w2utils._scrollBarSize) return w2utils._scrollBarSize; 
 		var html = '<div id="_scrollbar_width" style="position: absolute; top: -300px; width: 100px; height: 100px; overflow-y: scroll;">'+
 				   '	<div style="height: 120px">1</div>'+
 				   '</div>';
 		$('body').append(html);
-		w2utils._sbSize = 100 - $('#_scrollbar_width > div').width();
+		w2utils._scrollBarSize = 100 - $('#_scrollbar_width > div').width();
 		$('#_scrollbar_width').remove();
-		return w2utils._sbSize;
+		return w2utils._scrollBarSize;
 	}
 
 })();
@@ -1018,7 +1029,9 @@ w2utils.keyboard = (function (obj) {
 *	- column autosize based on largest content
 *	- more events in editable fields (onkeypress)
 * 	- move record with keyboard, grid does not follow
-*	- select group then click anywhere: record style is broken
+*	- add autoLoad = true, for infinite scroll
+*	- save grid state into localStorage and restore
+*	- search logic (AND or OR) if it is a list, it should be multiple list with or
 *
 * == 1.3 changes ==
 *	- added getRecordHTML, refactored, updated set()
@@ -1049,6 +1062,7 @@ w2utils.keyboard = (function (obj) {
 *	- added onToolbar event - click on any toolbar button
 *	- route all toolbar events thru the grid
 *	- infinite scroll (buffered scroll)
+*	- added grid.autoLoad = true
 *	- search 1-20 will range numbers
 *	- moved some settings to prototype
 * 	- added record.expanded = 'none' || 'spinner'
@@ -1056,6 +1070,9 @@ w2utils.keyboard = (function (obj) {
 *	- subgrid (easy way with keyboard navigation)
 *	- on/off line number and select column
 *	- added columnOnOff() internal method
+* 	- added skip()
+* 	- added onColumnOnOff
+* 	- record.render(record, record_index, column_index)
 *
 ************************************************************************/
 
@@ -1094,6 +1111,7 @@ w2utils.keyboard = (function (obj) {
 			toolbarSave	 	: false
 		}
 
+		this.autoLoad		= true; 	// for infinite scroll
 		this.fixedBody		= true;		// if false; then grid grows with data
 		this.recordHeight	= 25;
 		this.multiSearch	= true;
@@ -1103,7 +1121,7 @@ w2utils.keyboard = (function (obj) {
 		this.total			= 0;		// server total
 		this.buffered		= 0;		// number of records in the records array
 		this.limit			= 100;
-		this.offset			= 0;
+		this.offset			= 0;		// how many records to skip (for infinite scroll) when pulling from server
 		this.style			= '';
 
 		this.msgDelete		= w2utils.lang('Are you sure you want to delete selected records?');
@@ -1130,6 +1148,7 @@ w2utils.keyboard = (function (obj) {
 		this.onError 			= null;
 		this.onKeyboard			= null;
 		this.onToolbar			= null; 	// all events from toolbar
+		this.onColumnOnOff		= null;
 		this.onRender 			= null;
 		this.onRefresh 			= null;
 		this.onReload			= null;
@@ -1199,7 +1218,8 @@ w2utils.keyboard = (function (obj) {
 			for (var p in searches)   	object.searches[p]   	= $.extend(true, {}, searches[p]);
 			for (var p in searchData) 	object.searchData[p] 	= $.extend(true, {}, searchData[p]);
 			for (var p in sortData)		object.sortData[p]  	= $.extend(true, {}, sortData[p]);
-			for (var p in postData)   	object.postData[p]   	= $.extend(true, {}, postData[p]);
+			object.postData = $.extend(true, {}, postData);	
+
 			// check if there are records without recid
 			for (var r in records) {
 				if (records[r].recid == null || typeof records[r].recid == 'undefined') {
@@ -1263,7 +1283,6 @@ w2utils.keyboard = (function (obj) {
 		},
 
 		find: function (obj, returnRecords) {
-			//console.log(obj);
 			if (typeof obj == 'undefined' || obj == null) obj = {};
 			var recs = [];
 			for (var i=0; i<this.records.length; i++) {
@@ -1826,12 +1845,11 @@ w2utils.keyboard = (function (obj) {
 			this.set({ expanded: false });
 			// apply search
 			if (this.url != '') {
-				this.offset = 0;
+				this.last.xhr_offset = 0;
 				this.reload();
 			} else {
 				// local search
 				this.localSearch();
-				this.offset = 0;
 				this.refresh();
 			}
 			// event after
@@ -1931,16 +1949,35 @@ w2utils.keyboard = (function (obj) {
 			this.searchClose();
 			// apply search
 			if (this.url != '') {
-				this.offset = 0;
+				this.last.xhr_offset = 0;
 				this.reload();
 			} else {
 				// local search
 				this.localSearch();
-				this.offset = 0;
 				this.refresh();
 			}
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
+		},
+
+		skip: function (offset) {
+			if (this.url != '') {
+				this.offset = parseInt(offset);
+				if (this.offset < 0 || !w2utils.isInt(this.offset)) this.offset = 0;
+				if (this.offset > this.total) this.offset = this.total - this.limit;
+				// console.log('last', this.last);
+				this.records  = [];
+				this.buffered = 0;
+				this.last.xhr_offset = 0;
+				this.last.pull_more	 = true;
+				this.last.scrollTop	 = 0;
+				this.last.scrollLeft = 0;
+				$('#grid_'+ this.name +'_records').prop('scrollTop',  0);
+				this.initColumnOnOff();
+				this.reload();
+			} else {
+				console.log('ERROR: grid.skip() can only be called when you have remote data source.');
+			}
 		},
 
 		load: function (url, callBack) {
@@ -1954,7 +1991,7 @@ w2utils.keyboard = (function (obj) {
 
 		reload: function (callBack) {
 			if (this.url != '') {
-				this.refresh(); // show grid before pulling data
+				//this.refresh(); // show grid before pulling data
 				this.request('get-records', {}, null, callBack);
 			} else {
 				this.refresh();
@@ -1964,7 +2001,7 @@ w2utils.keyboard = (function (obj) {
 
 		reset: function (noRefresh) {
 			// reset last remembered state
-			this.offset 			= 0;
+			this.offset				= 0;
 			this.searchData			= [];
 			this.last.search		= '';
 			this.last.searchIds		= [];
@@ -1976,6 +2013,7 @@ w2utils.keyboard = (function (obj) {
 			this.last.selected		= [];
 			this.last.range_start	= null;
 			this.last.range_end		= null;
+			this.last.xhr_offset	= 0;
 			// initial search panel
 			if (this.last.sortData != null ) this.sortData	 = this.last.sortData;
 			// select none without refresh
@@ -1990,11 +2028,13 @@ w2utils.keyboard = (function (obj) {
 			if (url == '' || url == null) return;
 			// build parameters list
 			var params = {};
+			if (!w2utils.isInt(this.offset)) this.offset = 0;
+			if (!w2utils.isInt(this.last.xhr_offset)) this.last.xhr_offset = 0;
 			// add list params
 			params['cmd']  	 		= cmd;
 			params['name'] 	 		= this.name;
 			params['limit']  		= this.limit;
-			params['offset'] 		= this.offset;
+			params['offset'] 		= parseInt(this.offset) + this.last.xhr_offset;
 			params['selected'] 		= this.getSelection();
 			params['search']  		= this.searchData;
 			params['search-logic'] 	= this.last.logic;
@@ -2019,7 +2059,6 @@ w2utils.keyboard = (function (obj) {
 			if (!w2utils.settings.RESTfull) xhr_type = 'POST';
 			this.last.xhr_cmd	 = params.cmd;
 			this.last.xhr_start  = (new Date()).getTime();
-			this.last.xhr_offset = this.offset;
 			this.last.xhr = $.ajax({
 				type		: xhr_type,
 				url			: eventData.url, 
@@ -2040,7 +2079,8 @@ w2utils.keyboard = (function (obj) {
 			this.unlock();
 			setTimeout(function () { $('#grid_'+ obj.name +'_footer').find('.w2ui-footer-left').html('Server Response ' + 
 					((new Date()).getTime() - obj.last.xhr_start)/1000 + ' sec'); }, 10);
-			this.last.pull_more = false;
+			this.last.pull_more 	= false;
+			this.last.pull_refresh 	= true;
 
 			// event before
 			var event_name = 'load';
@@ -2103,6 +2143,7 @@ w2utils.keyboard = (function (obj) {
 				this.localSort();
 				this.localSearch();
 			}
+			this.total = parseInt(this.total);
 			this.trigger($.extend(eventData, { phase: 'after' }));
 			// do not refresh if loading on infinite scroll
 			if (this.last.xhr_offset == 0) this.refresh(); else this.doScroll();
@@ -2375,6 +2416,7 @@ w2utils.keyboard = (function (obj) {
 			if (eventData.stop === true) return false;
 			// default behavior
 			var sel 	= obj.getSelection();
+			if (sel.length == 0) return;
 			var records = $('#grid_'+ obj.name +'_records');
 			var recid	= sel[0];
 			var ind		= obj.get(recid, true);
@@ -2672,7 +2714,7 @@ w2utils.keyboard = (function (obj) {
 			} else {
 				// event after
 				this.trigger($.extend(eventData, { phase: 'after' }));
-				this.offset = 0;
+				this.last.xhr_offset = 0;
 				this.reload();
 			}
 		},
@@ -2935,18 +2977,31 @@ w2utils.keyboard = (function (obj) {
 					'</td>'+
 					'</tr>';
 			}
-			col_html += '<tr><td colspan="2"><div style="border-top: 1px solid #ddd;"></div></td></tr>'+
-						'<tr><td colspan="2" onclick="w2ui[\''+ obj.name +'\'].columnOnOff(this, event, \'line-numbers\');">'+
-						'	<div style="cursor: pointer; padding: 4px 8px">Toggle Line Numbers</div>'+
+			col_html += '<tr><td colspan="2"><div style="border-top: 1px solid #ddd;"></div></td></tr>';
+			if (this.url != '') {
+				col_html +=
+						'<tr><td colspan="2" style="padding: 0px">'+
+						'	<div style="cursor: pointer; padding: 2px 8px; cursor: default">'+
+						'		Skip <input type="text" style="width: 45px" value="'+ this.offset +'" '+
+						'				onchange="w2ui[\''+ obj.name +'\'].columnOnOff(this, event, \'skip\', this.value);"> Records'+
+						'	</div>'+
+						'</td></tr>';
+			}
+			col_html +=	'<tr><td colspan="2" onclick="w2ui[\''+ obj.name +'\'].columnOnOff(this, event, \'line-numbers\');">'+
+						'	<div style="cursor: pointer; padding: 4px 8px; cursor: default">Toggle Line Numbers</div>'+
 						'</td></tr>'+
 						'<tr><td colspan="2" onclick="w2ui[\''+ obj.name +'\'].columnOnOff(this, event, \'resize\');">'+
-						'	<div style="cursor: pointer; padding: 4px 8px">Reset Column Size</div>'+
+						'	<div style="cursor: pointer; padding: 4px 8px; cursor: default">Reset Column Size</div>'+
 						'</td></tr>';
 			col_html += "</table></div>";
 			this.toolbar.get('column-on-off').html = col_html;
 		},
 
-		columnOnOff: function (el, event, field) {
+		columnOnOff: function (el, event, field, value) {
+			// event before
+			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'columnOnOff', checkbox: el, field: field, event: event });
+			if (eventData.stop === true) return false;
+			// regular processing
 			var obj = this;
 			// collapse expanded rows
 			for (var r in this.records) { 
@@ -2957,6 +3012,9 @@ w2utils.keyboard = (function (obj) {
 			if (field == 'line-numbers') {
 				this.show.lineNumbers = !this.show.lineNumbers;
 				this.refresh();
+			} else if (field == 'skip') {
+				if (!w2utils.isInt(value)) value = 0;
+				obj.skip(value);
 			} else if (field == 'resize') {
 				// restore sizes
 				for (var c in this.columns) {
@@ -2979,9 +3037,13 @@ w2utils.keyboard = (function (obj) {
 			}
 			this.initColumnOnOff();
 			if (hide) {
-				setTimeout(function () { obj.toolbar.uncheck('column-on-off'); }, 100);
-				$().w2overlay();
+				setTimeout(function () { 
+					$().w2overlay();
+					obj.toolbar.uncheck('column-on-off'); 
+				}, 100);				
 			}
+			// event after
+			this.trigger($.extend(eventData, { phase: 'after' }));
 		},
 
 		initToolbar: function () {
@@ -3308,7 +3370,7 @@ w2utils.keyboard = (function (obj) {
 			if (body.width() < $(records).find(':first-child').width())   var bodyOverflowX = true; else bodyOverflowX = false;
 			if (!this.fixedBody) { bodyOverflowY = false; bodyOverflowX = false; }
 			if (bodyOverflowX || bodyOverflowY) {
-				columns.find('> table > tbody > tr:nth-child(1) td.w2ui-head-last').css('width', w2utils.sbSize()).show();
+				columns.find('> table > tbody > tr:nth-child(1) td.w2ui-head-last').css('width', w2utils.scrollBarSize()).show();
 				records.css({ 
 					top: ((this.columnGroups.length > 0 && this.show.columns ? 1 : 0) + w2utils.getSize(columns, 'height')) +'px',
 					"-webkit-overflow-scrolling": "touch",
@@ -3347,7 +3409,7 @@ w2utils.keyboard = (function (obj) {
 			}
 			if (body.length > 0) {
 				var width_max = parseInt(body.width())
-					- (bodyOverflowY ? w2utils.sbSize() : 0)
+					- (bodyOverflowY ? w2utils.scrollBarSize() : 0)
 					- (this.show.lineNumbers ? 34 : 0)
 					- (this.show.selectColumn ? 26 : 0)
 					- (this.show.expandColumn ? 26 : 0);
@@ -3434,7 +3496,7 @@ w2utils.keyboard = (function (obj) {
 					i++;
 				}
 			} else if (width_diff > 0) {
-				columns.find('> table > tbody > tr:nth-child(1) td.w2ui-head-last').css('width', w2utils.sbSize()).show();
+				columns.find('> table > tbody > tr:nth-child(1) td.w2ui-head-last').css('width', w2utils.scrollBarSize()).show();
 			}
 			// resize columns
 			columns.find('> table > tbody > tr:nth-child(1) td').each(function (index, el) {
@@ -3442,7 +3504,7 @@ w2utils.keyboard = (function (obj) {
 				if (typeof ind != 'undefined' && obj.columns[ind]) $(el).css('width', obj.columns[ind].sizeCalculated);
 				// last column
 				if ($(el).hasClass('w2ui-head-last')) {
-					$(el).css('width', w2utils.sbSize() + (width_diff > 0 && percent == 0 ? width_diff : 0) + 'px');
+					$(el).css('width', w2utils.scrollBarSize() + (width_diff > 0 && percent == 0 ? width_diff : 0) + 'px');
 				}
 			});
 			// if there are column groups - hide first row (needed for sizing)
@@ -3469,7 +3531,7 @@ w2utils.keyboard = (function (obj) {
 				if (typeof ind != 'undefined' && obj.columns[ind]) $(el).css('width', obj.columns[ind].sizeCalculated);
 				// last column
 				if ($(el).hasClass('w2ui-grid-data-last')) {
-					$(el).css('width', w2utils.sbSize() + (width_diff > 0 && percent == 0 ? width_diff : 0) + 'px');
+					$(el).css('width', w2utils.scrollBarSize() + (width_diff > 0 && percent == 0 ? width_diff : 0) + 'px');
 				}
 			});
 			this.initResize();
@@ -3690,8 +3752,8 @@ w2utils.keyboard = (function (obj) {
 		},
 
 		getRecordsHTML: function () {
-			this.show_extra = 30;	// larget number works better with chrome, smaller with FF.
-			if (this.buffered <= 300) this.show_extra = 300;
+			// larget number works better with chrome, smaller with FF.
+			if (this.buffered > 300) this.show_extra = 30; else this.show_extra = 300; 
 			var records	= $('#grid_'+ this.name +'_records');
 			var limit	= Math.floor(records.height() / this.recordHeight) + this.show_extra + 1;
 			if (!this.fixedBody) limit = this.buffered;
@@ -3706,6 +3768,9 @@ w2utils.keyboard = (function (obj) {
 			}
 			html += '<tr id="grid_'+ this.name + '_rec_bottom" line="bottom" style="height: '+ ((this.buffered - limit) * this.recordHeight) +'px">'+
 					'	<td colspan="200"></td>'+
+					'</tr>'+
+					'<tr id="grid_'+ this.name +'_rec_more" style="display: none">'+
+					'	<td colspan="200" class="w2ui-load-more"></td>'+
 					'</tr>'+
 					'</table>';
 			this.last.range_start = 0;
@@ -3728,16 +3793,19 @@ w2utils.keyboard = (function (obj) {
 			var obj  = this;
 			var records	= $('#grid_'+ this.name +'_records');
 			if (records.length == 0) return;
+			if (this.buffered > 300) this.show_extra = 30; else this.show_extra = 300; 
+			// need this to enable scrolling when this.limit < then a screen can fit
+			if (records.height() < this.buffered * this.recordHeight && records.css('overflow-y') == 'hidden') {
+				this.refresh();
+				return;
+			}
 			// update footer
 			var t1 = Math.floor(records[0].scrollTop / this.recordHeight + 1);
 			var t2 = Math.floor(records[0].scrollTop / this.recordHeight + 1) + Math.floor(records.height() / this.recordHeight);
 			if (t1 > this.buffered) t1 = this.buffered;
 			if (t2 > this.buffered) t2 = this.buffered;
-			$('#grid_'+ this.name + '_footer .w2ui-footer-right').html(
-				String(t1).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,") + '-' + 
-				String(t2).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,") + ' of ' + 
-				String(this.total).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,") +
-				(this.url != '' ? ' (buffered '+ String(this.buffered).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,") + ')' : '')
+			$('#grid_'+ this.name + '_footer .w2ui-footer-right').html(w2utils.format(this.offset + t1) + '-' + w2utils.format(this.offset + t2) + ' of ' +	w2utils.format(this.total) + 
+					(this.url != '' ? ' (buffered '+ w2utils.format(this.buffered) + (this.offset > 0 ? ', skip ' + w2utils.format(this.offset) : '') + ')' : '')
 			);
 			if (!this.fixedBody || this.total <= 300) return;
 			// regular processing
@@ -3753,9 +3821,10 @@ w2utils.keyboard = (function (obj) {
 			if (String(tr2.prev().prop('id')).indexOf('_expanded_row') != -1) tr2.prev().remove();
 			var first = parseInt(tr1.next().attr('line'));
 			var last  = parseInt(tr2.prev().attr('line'));
-			//console.log('show: ' + start + '-'+ end + ' ===> current: ' + first + '-' + last);
-			if (first < start || first == 1) { // scroll down
-				if (end <= last + this.show_extra && end < this.buffered) return;
+			//$('#log').html('buffer: '+ this.buffered +' start-end: ' + start + '-'+ end + ' ===> first-last: ' + first + '-' + last);
+			if (first < start || first == 1 || this.last.pull_refresh) { // scroll down
+				if (end <= last + this.show_extra && end != this.total && !this.last.pull_refresh) return; 
+				this.last.pull_refresh = false;
 				// remove from top
 				while (true) {
 					var tmp = records.find('#grid_'+ this.name +'_rec_top').next();
@@ -3769,17 +3838,7 @@ w2utils.keyboard = (function (obj) {
 				for (var i = parseInt(rec_start) + 1; i <= end; i++) {
 					tr2.before(this.getRecordHTML(i-1, i));
 				}
-				// mark search
-				clearTimeout(obj.last.marker_timer);
-				obj.last.marker_timer = setTimeout(function () {
-					// mark all search strings
-					var str = [];
-					for (var s in obj.searchData) {
-						var tmp = obj.searchData[s];
-						if ($.inArray(tmp.value, str) == -1) str.push(tmp.value);
-					}
-					if (str.length > 0) $(obj.box).find('.w2ui-grid-data > div').w2marker(str);
-				}, 50);
+				markSearch();
 			} else { // scroll up
 				if (start >= first - this.show_extra && start > 1) return;
 				// remove from bottom
@@ -3795,30 +3854,58 @@ w2utils.keyboard = (function (obj) {
 				for (var i = parseInt(rec_start) - 1; i >= start; i--) {
 					tr1.after(this.getRecordHTML(i-1, i));
 				}
-				// mark search
-				clearTimeout(obj.last.marker_timer);
-				obj.last.marker_timer = setTimeout(function () {
-					var str  = $.trim($('#grid_'+ obj.name +'_search_all').val());
-					if (str != '') $(obj.box).find('.w2ui-grid-data > div').w2marker(str);
-				}, 50);
+				markSearch();
 			}
 			// first/last row size
-			var h1 = (start - 1) * this.recordHeight;
-			var h2 = (this.buffered - end) * this.recordHeight;
-			if (h2 < 0) h = 0;
+			var h1 = (start - 1) * obj.recordHeight;
+			var h2 = (this.buffered - end) * obj.recordHeight;
+			if (h2 < 0) h2 = 0;
 			tr1.css('height', h1 + 'px');
 			tr2.css('height', h2 + 'px');
-			this.last.range_start = start;
-			this.last.range_end   = end;
+			obj.last.range_start = start;
+			obj.last.range_end   = end;
 			// load more if needed
 			var s = Math.floor(records[0].scrollTop / this.recordHeight);
 			var e = s + Math.floor(records.height() / this.recordHeight);
-			if (e + 10 > this.buffered && this.last.pull_more !== true && this.buffered < this.total) {
-				this.last.pull_more = true;
-				this.offset += this.limit;
-				this.request('get-records');
+			if (e + 20 > this.buffered && this.last.pull_more !== true && this.buffered < this.total - this.offset) {
+				// console.log('more', s, e, this.buffered, this.last.pull_more);
+				if (this.autoLoad === true) {
+					this.last.pull_more = true;
+					this.last.xhr_offset += this.limit;
+					this.request('get-records');
+				} else {
+					var more = $('#grid_'+ this.name +'_rec_more');
+					if (more.css('display') == 'none') {
+						more.show()
+							.on('click', function () {
+								$(this).find('td').html('<div><div style="width: 20px; height: 20px;" class="w2ui-spinner"></div></div>');
+								obj.last.pull_more = true;
+								obj.last.xhr_offset += obj.limit;
+								obj.request('get-records');
+							});
+					}
+					if (more.find('td').text().indexOf('Load') == -1) {
+						more.find('td').html('<div>Load '+ obj.limit + ' More...</div>');
+					}
+				}
 			}
+			// check for grid end
+			if (this.buffered >= this.total - this.offset) $('#grid_'+ this.name +'_rec_more').hide();
 			return;
+
+			function markSearch() {
+				// mark search
+				clearTimeout(obj.last.marker_timer);
+				obj.last.marker_timer = setTimeout(function () {
+					// mark all search strings
+					var str = [];
+					for (var s in obj.searchData) {
+						var tmp = obj.searchData[s];
+						if ($.inArray(tmp.value, str) == -1) str.push(tmp.value);
+					}
+					if (str.length > 0) $(obj.box).find('.w2ui-grid-data > div').w2marker(str);
+				}, 50);
+			}
 		},
 
 		getRecordHTML: function (ind, lineNum, summary) {
@@ -3925,14 +4012,14 @@ w2utils.keyboard = (function (obj) {
 				if (col.hidden) { col_ind++; if (typeof this.columns[col_ind] == 'undefined') break; else continue; }
 				var field = this.parseObj(record, col.field);
 				if (typeof col.render != 'undefined') {
-					if (typeof col.render == 'function') field = col.render.call(this, this.records[ind], ind);
+					if (typeof col.render == 'function') field = col.render.call(this, this.records[ind], ind, col_ind);
 					if (typeof col.render == 'object')   field = col.render[field];
 				}
 				if (field == null || typeof field == 'undefined') field = '';
 
 				var title = String(field).replace(/"/g, "''");
 				if (typeof col.title != 'undefined') {
-					if (typeof col.title == 'function') title = col.title.call(this, this.records[ind], ind);
+					if (typeof col.title == 'function') title = col.title.call(this, this.records[ind], ind, col_ind);
 					if (typeof col.title == 'string')   title = col.title;
 				}
 				var rec_field = '<div title="'+ title +'">'+ field +'</div>';
@@ -3989,7 +4076,6 @@ w2utils.keyboard = (function (obj) {
 					'	</td>'+
 					'</tr>';
 			}
-			//console.log('getHTML', ind);
 			return rec_html;
 		},
 
@@ -4072,6 +4158,8 @@ w2utils.keyboard = (function (obj) {
 *
 * == NICE TO HAVE ==
 *	- onResize for the panel
+*	- problem with layout.html (see in 1.3)
+*	- add layout.lock(), unlock()
 *
 * == 1.3 changes ==
 *   - tabs can be array of string, array of tab objects or w2tabs object
@@ -4337,6 +4425,7 @@ w2utils.keyboard = (function (obj) {
 			if (obj == null) return false;
 			$.extend(this.panels[obj], options);
 			this.refresh(panel);
+			this.resize(); // resize is needed when panel size is changed
 			return true;		
 		},
 	
@@ -5035,7 +5124,7 @@ w2utils.keyboard = (function (obj) {
 			}
 			if (parseInt(width)  - 10 < parseInt(options.width))  options.width  = parseInt(width)  - 10;
 			if (parseInt(height) - 10 < parseInt(options.height)) options.height = parseInt(height) - 10;
-			var top  = ((parseInt(height) - parseInt(options.height)) / 2) * 0.8;
+			var top  = ((parseInt(height) - parseInt(options.height)) / 2) * 0.6;
 			var left = (parseInt(width) - parseInt(options.width)) / 2;
 			
 			// check if message is already displayed
@@ -6444,7 +6533,7 @@ w2utils.keyboard = (function (obj) {
 							// window.click to hide it
 							$(document).on('click', hideDrop);
 							function hideDrop() {
-								it.checked = !it.checked;
+								it.checked = false;
 								if (it.checked) {
 									$('#tb_'+ obj.name +'_item_'+ w2utils.escapeId(it.id) +' table.w2ui-button').addClass('checked');
 								} else {
@@ -7072,7 +7161,7 @@ w2utils.keyboard = (function (obj) {
 				} else {
 					if (nd.selected && !nd.disabled) obj.selected = nd.id;
 					var tmp = '';
-					if (img)  tmp = '<div class="w2ui-node-image w2ui-icon '+ img +	(nd.selected && !nd.disabled ? "w2ui-icon-selected" : "") +'"></div>';
+					if (img)  tmp = '<div class="w2ui-node-image w2ui-icon '+ img +	(nd.selected && !nd.disabled ? " w2ui-icon-selected" : "") +'"></div>';
 					if (icon) tmp = '<div class="w2ui-node-image"><span class="'+ icon +'"></span></div>';
 					html = 
 					'<div class="w2ui-node '+ (nd.selected ? 'w2ui-selected' : '') +' '+ (nd.disabled ? 'w2ui-disabled' : '') +'" id="node_'+ nd.id +'" style="'+ (nd.hidden ? 'display: none;' : '') +'"'+
