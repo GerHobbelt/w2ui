@@ -46,9 +46,9 @@ var w2utils = (function () {
 		isEmail			: isEmail,
 		isDate			: isDate,
 		isTime			: isTime,
-		size 			: size,
 		age 			: age,
 		date 			: date,
+		size 			: size,
 		formatDate		: formatDate,
 		format			: format,
 		stripTags		: stripTags,
@@ -57,9 +57,9 @@ var w2utils = (function () {
 		base64encode	: base64encode,
 		base64decode	: base64decode,
 		transition		: transition,
+		lang 			: lang,
 		getSize			: getSize,
 		scrollBarSize	: scrollBarSize,
-		lang 			: lang,
 		locale	 		: locale
 	}
 	return obj;
@@ -1028,10 +1028,10 @@ w2utils.keyboard = (function (obj) {
 *	- frozen columns
 *	- column autosize based on largest content
 *	- more events in editable fields (onkeypress)
-* 	- move record with keyboard, grid does not follow
-*	- add autoLoad = true, for infinite scroll
 *	- save grid state into localStorage and restore
 *	- search logic (AND or OR) if it is a list, it should be multiple list with or
+*	- easy bubbles in the grid
+*	- render: 'number', 'date', 'time', 'datetime', 'money', 
 *
 * == 1.3 changes ==
 *	- added getRecordHTML, refactored, updated set()
@@ -1073,6 +1073,7 @@ w2utils.keyboard = (function (obj) {
 * 	- added skip()
 * 	- added onColumnOnOff
 * 	- record.render(record, record_index, column_index)
+*	- added grid.scrollIntoView()
 *
 ************************************************************************/
 
@@ -2421,11 +2422,7 @@ w2utils.keyboard = (function (obj) {
 			var recid	= sel[0];
 			var ind		= obj.get(recid, true);
 			var rec 	= obj.get(recid);
-			var sTop	= parseInt(records.prop('scrollTop'));
-			var sHeight = parseInt(records.height());
 			var recEL	= $('#grid_'+ obj.name +'_rec_'+ w2utils.escapeId(obj.records[ind].recid));
-			var rTop 	= parseInt(recEL[0].offsetTop);
-			var rHeight = parseInt(recEL.height());
 			var cancel  = false;
 			switch (event.keyCode) {
 				case 32: // spacebar
@@ -2504,7 +2501,7 @@ w2utils.keyboard = (function (obj) {
 						}
 						obj.selectNone();
 						obj.doClick(obj.records[ind].recid, event);
-						obj.scrollIntoView();
+						obj.scrollIntoView(ind);
 						if (event.preventDefault) event.preventDefault();
 					} else {
 						// jump out of subgird (if first record)
@@ -2546,7 +2543,7 @@ w2utils.keyboard = (function (obj) {
 						}
 						obj.selectNone();
 						obj.doClick(obj.records[ind].recid, event);
-						obj.scrollIntoView();
+						obj.scrollIntoView(ind);
 						cancel = true;
 					} else {
 						// jump out of subgrid (if last record in subgrid)
@@ -2570,15 +2567,19 @@ w2utils.keyboard = (function (obj) {
 			obj.trigger($.extend(eventData, { phase: 'after' }));
 		},
 
-		scrollIntoView: function () {
-			// scroll into view is buggy
-			// $('#grid_'+ obj.name + '_rec_' + obj.records[ind].recid).scrollintoview({ duration: 50 });
-			// if (rTop - rHeight < sTop) {
-			// 	setTimeout(function () {
-			// 		records.attr('scrollTop', rTop - rHeight * 10);
-			// 		obj.last.scrollTop = records.attr('scrollTop');
-			// 	}, 1);
-			// }
+		scrollIntoView: function (ind) {
+			if (typeof ind == 'undefined') {
+				var sel = this.getSelection();
+				if (sel.length == 0) return;
+				ind	= this.get(sel[0], true);
+			}
+			var records	= $('#grid_'+ this.name +'_records');
+			if (records.length == 0) return;
+			var t1 = Math.floor(records[0].scrollTop / this.recordHeight);
+			var t2 = t1 + Math.floor(records.height() / this.recordHeight);
+			if (ind == t1) records.animate({ 'scrollTop': records.scrollTop() - records.height() / 1.3 });
+			if (ind == t2) records.animate({ 'scrollTop': records.scrollTop() + records.height() / 1.3 });
+			if (ind < t1 || ind > t2) records.animate({ 'scrollTop': (ind - 1) * this.recordHeight });
 		},
 
 		doDblClick: function (recid, event) {
@@ -3366,8 +3367,10 @@ w2utils.keyboard = (function (obj) {
 			}
 
 			// check overflow
-			if (body.height() - columns.height() < $(records).find(':first-child').height()) var bodyOverflowY = true; else bodyOverflowY = false;
-			if (body.width() < $(records).find(':first-child').width())   var bodyOverflowX = true; else bodyOverflowX = false;
+			var bodyOverflowX = false;
+			var bodyOverflowY = false;
+			if (body.width() < $(records).find('>table').width()) bodyOverflowX = true;
+			if (body.height() - columns.height() < $(records).find('>table').height() + (bodyOverflowX ? w2utils.scrollBarSize() : 0)) bodyOverflowY = true;
 			if (!this.fixedBody) { bodyOverflowY = false; bodyOverflowX = false; }
 			if (bodyOverflowX || bodyOverflowY) {
 				columns.find('> table > tbody > tr:nth-child(1) td.w2ui-head-last').css('width', w2utils.scrollBarSize()).show();
@@ -3801,7 +3804,7 @@ w2utils.keyboard = (function (obj) {
 			}
 			// update footer
 			var t1 = Math.floor(records[0].scrollTop / this.recordHeight + 1);
-			var t2 = Math.floor(records[0].scrollTop / this.recordHeight + 1) + Math.floor(records.height() / this.recordHeight);
+			var t2 = Math.floor(records[0].scrollTop / this.recordHeight + 1) + Math.round(records.height() / this.recordHeight);
 			if (t1 > this.buffered) t1 = this.buffered;
 			if (t2 > this.buffered) t2 = this.buffered;
 			$('#grid_'+ this.name + '_footer .w2ui-footer-right').html(w2utils.format(this.offset + t1) + '-' + w2utils.format(this.offset + t2) + ' of ' +	w2utils.format(this.total) +
@@ -3836,6 +3839,8 @@ w2utils.keyboard = (function (obj) {
 				var rec_start = tmp.attr('line');
 				if (rec_start == 'top') rec_start = start;
 				for (var i = parseInt(rec_start) + 1; i <= end; i++) {
+					if (!this.records[i-1]) continue;
+					if (this.records[i-1].expanded === true) this.records[i-1].expanded = false;
 					tr2.before(this.getRecordHTML(i-1, i));
 				}
 				markSearch();
@@ -3852,6 +3857,8 @@ w2utils.keyboard = (function (obj) {
 				var rec_start = tmp.attr('line');
 				if (rec_start == 'bottom') rec_start = end;
 				for (var i = parseInt(rec_start) - 1; i >= start; i--) {
+					if (!this.records[i-1]) continue;
+					if (this.records[i-1].expanded === true) this.records[i-1].expanded = false;
 					tr1.after(this.getRecordHTML(i-1, i));
 				}
 				markSearch();
@@ -4065,7 +4072,7 @@ w2utils.keyboard = (function (obj) {
 			rec_html += '<td class="w2ui-grid-data-last"></td>';
 			rec_html += '</tr>';
 			// if row is expanded
-			if (record.expanded === true && $('#grid_'+ this.name +'_rec_'+ record.recid +'_expanded_row').length == 0) {
+			if (record.expanded === true) { // && $('#grid_'+ this.name +'_rec_'+ record.recid +'_expanded_row').length == 0
 				var tmp = 1 + (this.show.selectColumn ? 1 : 0);
 				rec_html +=
 					'<tr id="grid_'+ this.name +'_rec_'+ record.recid +'_expanded_row">'+
@@ -8386,6 +8393,7 @@ w2utils.keyboard = (function (obj) {
 * 	- generate should use fields, and not its own structure
 *	- added submit() as alias of save()
 *	- moved some settings to prototype
+*	- added form.onValidate event
 *
 ************************************************************************/
 
@@ -8417,6 +8425,7 @@ w2utils.keyboard = (function (obj) {
 		// events
 		this.onRequest  	= null;
 		this.onLoad 		= null;
+		this.onValidate		= null;
 		this.onSubmit		= null;
 		this.onSave			= null;
 		this.onChange		= null;
@@ -8659,37 +8668,27 @@ w2utils.keyboard = (function (obj) {
 				switch (field.type) {
 					case 'int':
 						if (this.record[field.name] && !w2utils.isInt(this.record[field.name])) {
-							var error = { field: field, error: w2utils.lang('Not an integer') };
-							errors.push(error);
-							if (showErrors) $(field.el).w2tag(error.error, { "class": 'w2ui-error' });
+							errors.push({ field: field, error: w2utils.lang('Not an integer') });
 						} 
 						break;
 					case 'float':
 						if (this.record[field.name] && !w2utils.isFloat(this.record[field.name])) {
-							var error = { field: field, error: w2utils.lang('Not a float') };
-							errors.push(error);
-							if (showErrors) $(field.el).w2tag(error.error, { "class": 'w2ui-error' });
+							errors.push({ field: field, error: w2utils.lang('Not a float') });
 						} 
 						break;
 					case 'money':
 						if (this.record[field.name] && !w2utils.isMoney(this.record[field.name])) {
-							var error = { field: field, error: w2utils.lang('Not in money format') };
-							errors.push(error);
-							if (showErrors) $(field.el).w2tag(error.error, { "class": 'w2ui-error' });
+							errors.push({ field: field, error: w2utils.lang('Not in money format') });
 						} 
 						break;
 					case 'hex':
 						if (this.record[field.name] && !w2utils.isHex(this.record[field.name])) {
-							var error = { field: field, error: w2utils.lang('Not a hex number') };
-							errors.push(error);
-							if (showErrors) $(field.el).w2tag(error, { "class": 'w2ui-error' });
+							errors.push({ field: field, error: w2utils.lang('Not a hex number') });
 						} 
 						break;
 					case 'email':
 						if (this.record[field.name] && !w2utils.isEmail(this.record[field.name])) {
-							var error = { field: field, error: w2utils.lang('Not a valid email') };
-							errors.push(error);
-							if (showErrors) $(field.el).w2tag(error.error, { "class": 'w2ui-error' });
+							errors.push({ field: field, error: w2utils.lang('Not a valid email') });
 						} 
 						break;
 					case 'checkbox':
@@ -8699,9 +8698,7 @@ w2utils.keyboard = (function (obj) {
 					case 'date':
 						// format date before submit
 						if (this.record[field.name] && !w2utils.isDate(this.record[field.name], field.options.format)) {
-							var error = { field: field, error: w2utils.lang('Not a valid date') + ': ' + field.options.format };
-							errors.push(error);
-							if (showErrors) $(field.el).w2tag(error.error, { "class": 'w2ui-error' });
+							errors.push({ field: field, error: w2utils.lang('Not a valid date') + ': ' + field.options.format });
 						} else {
 							// convert to universal timestamp with time zone
 							//var d = new Date(this.record[field.name]);
@@ -8721,11 +8718,19 @@ w2utils.keyboard = (function (obj) {
 				// === check required - if field is '0' it should be considered not empty
 				var val = this.record[field.name];
 				if ( field.required && (val === '' || ($.isArray(val) && val.length == 0)) ) {
-					var error = { field: field, error: w2utils.lang('Required field') };
-					errors.push(error);
-					if (showErrors) $(field.el).w2tag(error.error, { "class": 'w2ui-error' });
+					errors.push({ field: field, error: w2utils.lang('Required field') });
 				}
 			}
+			// event before
+			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'validate', errors: errors });
+			if (eventData.stop === true) return errors;
+			// show error
+			if (showErrors) for (var e in eventData.errors) {
+				var err = eventData.errors[e];
+				$(err.field.el).w2tag(err.error, { "class": 'w2ui-error' });
+			}
+			// event after
+			this.trigger($.extend(eventData, { phase: 'after' }));
 			return errors;
 		},
 

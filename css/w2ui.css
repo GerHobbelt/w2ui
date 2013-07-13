@@ -293,7 +293,6 @@ select {
 }
 .w2ui-label {
   float: left;
-  clear: left;
   margin-top: 6px;
   margin-bottom: 3px;
   width: 120px;
@@ -1417,6 +1416,7 @@ select {
   box-sizing: border-box;
   border-top: 0px;
   border-radius: 0px 0px 6px 6px;
+  overflow: auto;
 }
 .w2ui-popup .w2ui-msg-buttons {
   padding: 8px;
