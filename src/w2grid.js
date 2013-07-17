@@ -14,11 +14,15 @@
 *	- save grid state into localStorage and restore
 *	- search logic (AND or OR) if it is a list, it should be multiple list with or
 *	- easy bubbles in the grid
-*	- render: 'number', 'date', 'time', 'datetime', 'money', 
+*	- possibly add context menu similar to sidebar's
 *
 * == 1.3 changes ==
+*	- added onEdit, an event to catch the edit record event when you click the edit button
+*	- added toolbarEdit, to send the OnEdit event
+*	- Changed doEdit to edit one field in doEditField, to add the doEdit event to edit one record in a popup
 *	- added getRecordHTML, refactored, updated set()
 *	- added onKeyboard event
+*	- added keyboard = true property
 * 	- refresh() and resize() returns number of milliseconds it took
 *	- optimized width distribution and resize
 *	- 50 columns resize 2% - margin of error is huge
@@ -49,7 +53,7 @@
 *	- search 1-20 will range numbers
 *	- moved some settings to prototype
 * 	- added record.expanded = 'none' || 'spinner'
-*	- added lock(.., spinner) - show spinner
+*	- added lock(.., showSpinner) - show spinner
 *	- subgrid (easy way with keyboard navigation)
 *	- on/off line number and select column
 *	- added columnOnOff() internal method
@@ -57,6 +61,9 @@
 * 	- added onColumnOnOff
 * 	- record.render(record, record_index, column_index)
 *	- added grid.scrollIntoView()
+*	- added render formatters (number, int, float, money, age, date)
+*	- renames: doAdd -> toolbarAdd, doEdit -> toolbarEdit, doSave -> toolbarSave, doDelete -> toolbarDelete
+*	- renames: doClick -> click, doDblClick -> dblClick, doEditField -> editField, doScroll -> scroll, doSort -> sort
 *
 ************************************************************************/
 
@@ -91,13 +98,15 @@
 			toolbarColumns	: true,
 			toolbarSearch	: true,
 			toolbarAdd		: false,
+			toolbarEdit 	: false,
 			toolbarDelete 	: false,
-			toolbarSave	 	: false
+			toolbarSave		: false
 		}
 
 		this.autoLoad		= true; 	// for infinite scroll
 		this.fixedBody		= true;		// if false; then grid grows with data
 		this.recordHeight	= 25;
+		this.keyboard 		= true;
 		this.multiSearch	= true;
 		this.multiSelect	= true;
 		this.multiSort		= true;
@@ -114,6 +123,7 @@
 
 		// events
 		this.onAdd				= null;
+		this.onEdit				= null;
 		this.onRequest			= null;		// called on any server event
 		this.onLoad				= null;
 		this.onDelete			= null;
@@ -486,6 +496,7 @@
 				console.log('ERROR: grid.localSort can only be used on local data source, grid.url should be empty.');
 				return;
 			}
+			if ($.isEmptyObject(this.sortData)) return;
 			var time = (new Date()).getTime();
 			var obj = this;
 			this.records.sort(function (a, b) {
@@ -546,24 +557,21 @@
  								if (rec[search.field] == sdata.value) fl++; // do not hide record
                                 if ((search.type == 'text' || search.type == 'list') && val1 == val2) fl++;
 								if (search.type == 'date') {
-									var da = new Date(val1);
-									var db = new Date(val2);
-									d0 = Date.UTC(da.getFullYear(), da.getMonth(), da.getDate());
-									d1 = Date.UTC(db.getFullYear(), db.getMonth(), db.getDate());
-									if (d0 == d1) fl++;
+									var tmp = new Date(Number(val1)); // create date
+									val1 = (new Date(tmp.getFullYear(), tmp.getMonth(), tmp.getDate())).getTime(); // drop time
+									val2 = Number(val2);
+									var val3 = Number(val1) + 86400000; // 1 day
+									if (val2 >= val1 && val2 <= val3) fl++;
 								}
 								break;
 							case 'between':
 								if (search.type == 'int' && parseInt(rec[search.field]) >= parseInt(val2) && parseInt(rec[search.field]) <= parseInt(val3)) fl++;
 								if (search.type == 'float' && parseFloat(rec[search.field]) >= parseFloat(val2) && parseFloat(rec[search.field]) <= parseFloat(val3)) fl++;
 								if (search.type == 'date') {
-									var da = new Date(val1);
-									var db = new Date(val2);
-									var dc = new Date(val3);
-									d0 = Date.UTC(da.getFullYear(), da.getMonth(), da.getDate());
-									d1 = Date.UTC(db.getFullYear(), db.getMonth(), db.getDate());
-									d2 = Date.UTC(dc.getFullYear(), dc.getMonth(), dc.getDate());
-									if (d0 >= d1 && d0 <= d2) fl++;
+									var tmp = new Date(Number(val3)); // create date
+									val3 = (new Date(tmp.getFullYear(), tmp.getMonth(), tmp.getDate())).getTime(); // drop time
+									var val3 = Number(val3) + 86400000; // 1 day
+									if (val1 >= val2 && val1 < val3) fl++;
 								}
 								break;
 							case 'begins with':
@@ -620,6 +628,9 @@
 				if (sel.length == 1) msgLeft = 'Record ID: '+ sel[0] + ' ';
 			}
 			$('#grid_'+ this.name +'_footer .w2ui-footer-left').html(msgLeft);
+			// toolbar
+			if (sel.length == 1) this.toolbar.enable('edit'); else this.toolbar.disable('edit');
+			if (sel.length >= 1) this.toolbar.enable('delete'); else this.toolbar.disable('delete');
 			return selected;
 		},
 
@@ -660,6 +671,9 @@
 				if (sel.length == 1) msgLeft = 'Record ID: '+ sel[0] + ' ';
 			}
 			$('#'+ this.name +'_grid_footer .w2ui-footer-left').html(msgLeft);
+			// toolbar
+			if (sel.length == 1) this.toolbar.enable('edit'); else this.toolbar.disable('edit');
+			if (sel.length >= 1) this.toolbar.enable('delete'); else this.toolbar.disable('delete');
 			return unselected;
 		},
 
@@ -669,17 +683,24 @@
 			var eventData = this.trigger({ phase: 'before', type: 'select', target: this.name, all: true });
 			if (eventData.stop === true) return;
 			// default action
-			if (this.searchData.length == 0 && this.url == '') {
-				// not searched
-				this.set({ selected: true });
-			} else {
-				// local search applied
-				for (var i=0; i<this.last.searchIds.length; i++) {
-					this.records[this.last.searchIds[i]].selected = true;
+			if (this.url == '') {
+				if (this.searchData.length == 0) { 
+					// not searched
+					this.set({ selected: true });
+				} else { 
+					// local search applied
+					for (var i=0; i<this.last.searchIds.length; i++) {
+						this.records[this.last.searchIds[i]].selected = true;
+					}
+					this.refresh();
 				}
+			} else { // remote data source
+				this.set({ selected: true });
 				this.refresh();
 			}
-			if (this.getSelection().length > 0) this.toolbar.enable('delete'); else this.toolbar.disable('delete');
+			var sel = this.getSelection();
+			if (sel.length == 1) this.toolbar.enable('edit'); else this.toolbar.disable('edit');
+			if (sel.length >= 1) this.toolbar.enable('delete'); else this.toolbar.disable('delete');
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
 		},
@@ -698,6 +719,7 @@
 					$('#grid_'+ this.name +'_cell_'+ i +'_select_check').prop("checked", false);
 				}
 			}
+			this.toolbar.disable('edit', 'delete');
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
 		},
@@ -731,6 +753,18 @@
 							$.extend(tmp, { value: [value1, value2] });
 						} else {
 							$.extend(tmp, { value: value1 });
+						}
+						// conver date to unix time
+						try {
+							if (search.type == 'date' && operator == 'between') {
+								tmp.value[0] = w2utils.isDate(value1, w2utils.settings.date_format, true).getTime();
+								tmp.value[1] = w2utils.isDate(value2, w2utils.settings.date_format, true).getTime();
+							}
+							if (search.type == 'date' && operator == 'is') {
+								tmp.value = w2utils.isDate(value1, w2utils.settings.date_format, true).getTime();
+							}
+						} catch (e) {
+
 						}
 						searchData.push(tmp);
 					}
@@ -1130,7 +1164,7 @@
 			this.total = parseInt(this.total);
 			this.trigger($.extend(eventData, { phase: 'after' }));
 			// do not refresh if loading on infinite scroll
-			if (this.last.xhr_offset == 0) this.refresh(); else this.doScroll();
+			if (this.last.xhr_offset == 0) this.refresh(); else this.scroll();
 			// call back
 			if (typeof callBack == 'function') callBack();
 		},
@@ -1181,7 +1215,7 @@
 		// ===================================================
 		// --  Action Handlers
 
-		doAdd: function () {
+		toolbarAdd: function () {
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'add', recid: null });
 			if (eventData.stop === true) return false;
@@ -1189,7 +1223,18 @@
 			this.trigger($.extend(eventData, { phase: 'after' }));
 		},
 
-		doSave: function () {
+		toolbarEdit: function () {
+			var sel 	= this.getSelection();
+			var recid 	= null;
+			if (sel.length == 1) recid = sel[0];
+			// event before
+			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'edit', recid: recid });
+			if (eventData.stop === true) return false;
+			// event after
+			this.trigger($.extend(eventData, { phase: 'after' }));
+		},
+
+		toolbarSave: function () {
 			var obj = this;
 			var changed = this.getChanged();
 			// event before
@@ -1218,7 +1263,7 @@
 			}
 		},
 
-		doEdit: function (type, el, event) {
+		editField: function (type, el, event) {
 			var recid  = $(el).attr('recid');
 			var field  = $(el).attr('field');
 			var record = this.get(recid);
@@ -1279,7 +1324,7 @@
 			}
 		},
 
-		doDelete: function (force) {
+		toolbarDelete: function (force) {
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'delete' });
 			if (eventData.stop === true) return false;
@@ -1294,7 +1339,7 @@
 					title 	: w2utils.lang('Delete Confirmation'),
 					body 	: '<div class="w2ui-grid-delete-msg">'+ this.msgDelete +'</div>',
 					buttons : '<input type="button" value="'+ w2utils.lang('No') + '" onclick="$().w2popup(\'close\');" class="w2ui-grid-popup-btn">'+
-							  '<input type="button" value="'+ w2utils.lang('Yes') + '" onclick="w2ui[\''+ this.name +'\'].doDelete(true); $().w2popup(\'close\');" class="w2ui-grid-popup-btn">'
+							  '<input type="button" value="'+ w2utils.lang('Yes') + '" onclick="w2ui[\''+ this.name +'\'].toolbarDelete(true); $().w2popup(\'close\');" class="w2ui-grid-popup-btn">'
 				});
 				return;
 			}
@@ -1308,7 +1353,7 @@
 			this.trigger($.extend(eventData, { phase: 'after' }));
 		},
 
-		doClick: function (recid, event) {
+		click: function (recid, event) {
 			var time = (new Date()).getTime();
 			if (w2utils.isInt(recid)) recid = parseInt(recid);
 			if (typeof event == 'undefined') event = {};
@@ -1378,7 +1423,9 @@
 					setTimeout(function () { if (window.getSelection) window.getSelection().removeAllRanges(); }, 10);
 				}
 			}
-			if (sel.length > 0) obj.toolbar.enable('delete'); else obj.toolbar.disable('delete');
+			var sel = this.getSelection();
+			if (sel.length == 1) this.toolbar.enable('edit'); else this.toolbar.disable('edit');
+			if (sel.length >= 1) this.toolbar.enable('delete'); else this.toolbar.disable('delete');
 			// remember last selected
 			var msgLeft = '';
 			if (sel.length > 0) {
@@ -1395,6 +1442,7 @@
 		keydown: function (event) {
 			// this method is called from w2utils
 			var obj = this;
+			if (obj.keyboard !== true) return;
 			// trigger event
 			var eventData = obj.trigger({ phase: 'before', type: 'keyboard', target: obj.name, event: event });
 			if (eventData.stop === true) return false;
@@ -1412,7 +1460,7 @@
 					cancel = true;
 					break;
 				case 8: // backspace
-					obj.doDelete();
+					obj.toolbarDelete();
 					cancel = true;
 					break;
 				case 27: // escape
@@ -1444,7 +1492,7 @@
 						w2utils.keyboard.active(grid);
 						w2ui[grid].set(recid, { expanded: false });
 						w2ui[grid].collapse(recid);
-						w2ui[grid].doClick(recid);
+						w2ui[grid].click(recid);
 						cancel = true;
 						break;
 					}
@@ -1477,13 +1525,13 @@
 								var grid = subgrid.attr('name');
 								var recs = w2ui[grid].records;
 								w2utils.keyboard.active(grid);
-								w2ui[grid].doClick(recs[recs.length-1].recid);
+								w2ui[grid].click(recs[recs.length-1].recid);
 								cancel = true;
 								break;
 							}
 						}
 						obj.selectNone();
-						obj.doClick(obj.records[ind].recid, event);
+						obj.click(obj.records[ind].recid, event);
 						obj.scrollIntoView(ind);
 						if (event.preventDefault) event.preventDefault();
 					} else {
@@ -1494,7 +1542,7 @@
 							var grid  = parent.parents('.w2ui-grid').attr('name');
 							obj.selectNone();
 							w2utils.keyboard.active(grid);
-							w2ui[grid].doClick(recid);
+							w2ui[grid].click(recid);
 							cancel = true;
 							break;
 						}
@@ -1510,7 +1558,7 @@
 							var grid = subgrid.attr('name');
 							var recs = w2ui[grid].records;
 							w2utils.keyboard.active(grid);
-							w2ui[grid].doClick(recs[0].recid);
+							w2ui[grid].click(recs[0].recid);
 							cancel = true;
 							break;
 						}
@@ -1525,7 +1573,7 @@
 							}
 						}
 						obj.selectNone();
-						obj.doClick(obj.records[ind].recid, event);
+						obj.click(obj.records[ind].recid, event);
 						obj.scrollIntoView(ind);
 						cancel = true;
 					} else {
@@ -1536,7 +1584,7 @@
 							var grid  = parent.parents('.w2ui-grid').attr('name');
 							obj.selectNone();
 							w2utils.keyboard.active(grid);
-							w2ui[grid].doClick(recid);
+							w2ui[grid].click(recid);
 							cancel = true;
 							break;
 						}
@@ -1565,7 +1613,7 @@
 			if (ind < t1 || ind > t2) records.animate({ 'scrollTop': (ind - 1) * this.recordHeight });
 		},
 
-		doDblClick: function (recid, event) {
+		dblClick: function (recid, event) {
 			if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'dblClick', recid: recid, event: event });
@@ -1600,7 +1648,7 @@
 						(this.show.lineNumbers ? '<td class="w2ui-col-number"></td>' : '') +
 					'	<td class="w2ui-grid-data w2ui-expanded1" colspan="'+ tmp +'"><div style="display: none"></div></td>'+
 					'	<td colspan="100" class="w2ui-expanded2">'+
-					'		<div id="grid_'+ this.name +'_rec_'+ id +'_expanded" style="opacity: 0;"></div>'+
+					'		<div id="grid_'+ this.name +'_rec_'+ id +'_expanded" style="opacity: 0"></div>'+
 					'	</td>'+
 					'</tr>');
 			// event before
@@ -1657,7 +1705,7 @@
 			return true;
 		},
 
-		doSort: function (field, direction, event) {
+		sort: function (field, direction, event) {
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'sort', target: this.name, field: field, direction: direction, event: event });
 			if (eventData.stop === true) return false;
@@ -1740,6 +1788,7 @@
 			if (this.buffered <= 0 && this.url == '') this.buffered = this.total;
 
 			if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
+			this.toolbar.disable('edit', 'delete');
 			if (!this.box) return;
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'refresh' });
@@ -1800,7 +1849,7 @@
 						'		obj.last.scrollLeft = this.scrollLeft; '+
 						'		$(\'#grid_'+ this.name +'_columns\')[0].scrollLeft = this.scrollLeft;'+
 						'		$(\'#grid_'+ this.name +'_summary\')[0].scrollLeft = this.scrollLeft;'+
-						'		obj.doScroll(event);">'+
+						'		obj.scroll(event);">'+
 							this.getRecordsHTML() +
 						'</div>'+
 						'<div id="grid_'+ this.name +'_columns" class="w2ui-grid-columns">'+
@@ -1869,7 +1918,7 @@
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
 			obj.resize();
-			setTimeout(function () { obj.resize(); obj.doScroll(); }, 1); // allow to render first
+			setTimeout(function () { obj.resize(); obj.scroll(); }, 1); // allow to render first
 			return (new Date()).getTime() - time;
 		},
 
@@ -2076,17 +2125,20 @@
 						this.toolbar.items.push({ type: 'check', id: 'search-advanced', caption: w2utils.lang('Search...'), hint: w2utils.lang('Open Search Fields') });
 					}
 				}
-				if (this.show.toolbarAdd || this.show.toolbarDelete || this.show.toolbarSave) {
+				if (this.show.toolbarAdd || this.show.toolbarEdit || this.show.toolbarDelete || this.show.toolbarSave) {
 					this.toolbar.items.push({ type: 'break', id: 'break1' });
 				}
 				if (this.show.toolbarAdd) {
 					this.toolbar.items.push({ type: 'button', id: 'add', caption: w2utils.lang('Add New'), hint: w2utils.lang('Add new record'), img: 'icon-add' });
 				}
+				if (this.show.toolbarEdit) {
+					this.toolbar.items.push({ type: 'button', id: 'edit', caption: w2utils.lang('Edit'), hint: w2utils.lang('Edit selected record'), img: 'icon-edit', disabled: true });
+				}
 				if (this.show.toolbarDelete) {
 					this.toolbar.items.push({ type: 'button', id: 'delete', caption: w2utils.lang('Delete'), hint: w2utils.lang('Delete selected records'), img: 'icon-delete', disabled: true });
 				}
 				if (this.show.toolbarSave) {
-					if (this.show.toolbarAdd || this.show.toolbarDelete ) {
+					if (this.show.toolbarAdd || this.show.toolbarDelete || this.show.toolbarEdit) {
 						this.toolbar.items.push({ type: 'break', id: 'break2' });
 					}
 					this.toolbar.items.push({ type: 'button', id: 'save', caption: w2utils.lang('Save'), hint: w2utils.lang('Save changed records'), img: 'icon-save' });
@@ -2105,7 +2157,7 @@
 						case 'reload':
 							var eventData2 = obj.trigger({ phase: 'before', type: 'reload', target: obj.name });
 							if (eventData2.stop === true) return false;
-							obj.reset(true);
+							// obj.reset(true); // do not reset to preserve search and sort
 							obj.reload();
 							obj.trigger($.extend(eventData2, { phase: 'after' }));
 							break;
@@ -2134,13 +2186,16 @@
 							}
 							break;
 						case 'add':
-							obj.doAdd();
+							obj.toolbarAdd();
+							break;
+						case 'edit':
+							obj.toolbarEdit();
 							break;
 						case 'delete':
-							obj.doDelete();
+							obj.toolbarDelete();
 							break;
 						case 'save':
-							obj.doSave();
+							obj.toolbarSave();
 							break;
 					}
 					// no default action
@@ -2655,7 +2710,7 @@
 							resizer = '<div class="w2ui-resizer" name="'+ ii +'"></div>';
 						}
 						html += '<td class="w2ui-head '+ sortStyle +'" col="'+ ii + '" rowspan="2" colspan="'+ (colg.span + (i == obj.columnGroups.length-1 ? 1 : 0) ) +'" '+
-										(col.sortable ? 'onclick="w2ui[\''+ obj.name +'\'].doSort(\''+ col.field +'\', null, event);"' : '') +'>'+
+										(col.sortable ? 'onclick="w2ui[\''+ obj.name +'\'].sort(\''+ col.field +'\', null, event);"' : '') +'>'+
 									resizer +
 								'	<div class="w2ui-col-group '+ sortStyle +'">'+
 										(col.caption == '' ? '&nbsp;' : col.caption) +
@@ -2723,7 +2778,7 @@
 							resizer = '<div class="w2ui-resizer" name="'+ i +'"></div>';
 						}
 						html += '<td col="'+ i +'" class="w2ui-head '+ sortStyle +'" '+
-										(col.sortable ? 'onclick="w2ui[\''+ obj.name +'\'].doSort(\''+ col.field +'\', null, event);"' : '') + '>'+
+										(col.sortable ? 'onclick="w2ui[\''+ obj.name +'\'].sort(\''+ col.field +'\', null, event);"' : '') + '>'+
 									resizer +
 								'	<div class="'+ sortStyle +'">'+
 										(col.caption == '' ? '&nbsp;' : col.caption) +
@@ -2774,11 +2829,11 @@
 			return html;
 		},
 
-		doScroll: function (event) {
+		scroll: function (event) {
 			var time = (new Date()).getTime();
 			var obj  = this;
 			var records	= $('#grid_'+ this.name +'_records');
-			if (records.length == 0) return;
+			if (this.records.length == 0) return;
 			if (this.buffered > 300) this.show_extra = 30; else this.show_extra = 300;
 			// need this to enable scrolling when this.limit < then a screen can fit
 			if (records.height() < this.buffered * this.recordHeight && records.css('overflow-y') == 'hidden') {
@@ -2790,10 +2845,10 @@
 			var t2 = Math.floor(records[0].scrollTop / this.recordHeight + 1) + Math.round(records.height() / this.recordHeight);
 			if (t1 > this.buffered) t1 = this.buffered;
 			if (t2 > this.buffered) t2 = this.buffered;
-			$('#grid_'+ this.name + '_footer .w2ui-footer-right').html(w2utils.format(this.offset + t1) + '-' + w2utils.format(this.offset + t2) + ' of ' +	w2utils.format(this.total) +
-					(this.url != '' ? ' (buffered '+ w2utils.format(this.buffered) + (this.offset > 0 ? ', skip ' + w2utils.format(this.offset) : '') + ')' : '')
+			$('#grid_'+ this.name + '_footer .w2ui-footer-right').html(w2utils.formatNumber(this.offset + t1) + '-' + w2utils.formatNumber(this.offset + t2) + ' of ' +	w2utils.formatNumber(this.total) + 
+					(this.url != '' ? ' (buffered '+ w2utils.formatNumber(this.buffered) + (this.offset > 0 ? ', skip ' + w2utils.formatNumber(this.offset) : '') + ')' : '')
 			);
-			if (!this.fixedBody || this.total <= 300) return;
+			if (!this.fixedBody || this.total <= 300) return; 
 			// regular processing
 			var start 	= Math.floor(records[0].scrollTop / this.recordHeight) - this.show_extra;
 			var end		= start + Math.floor(records.height() / this.recordHeight) + this.show_extra * 2 + 1;
@@ -2809,7 +2864,8 @@
 			var last  = parseInt(tr2.prev().attr('line'));
 			//$('#log').html('buffer: '+ this.buffered +' start-end: ' + start + '-'+ end + ' ===> first-last: ' + first + '-' + last);
 			if (first < start || first == 1 || this.last.pull_refresh) { // scroll down
-				if (end <= last + this.show_extra && end != this.total && !this.last.pull_refresh) return;
+				//console.log('end', end, 'last', last, 'show_extre', this.show_extra, this.last.pull_refresh);
+				if (end <= last + this.show_extra - 2 && end != this.total) return;
 				this.last.pull_refresh = false;
 				// remove from top
 				while (true) {
@@ -2828,7 +2884,7 @@
 				}
 				markSearch();
 			} else { // scroll up
-				if (start >= first - this.show_extra && start > 1) return;
+				if (start >= first - this.show_extra + 2 && start > 1) return;
 				// remove from bottom
 				while (true) {
 					var tmp = records.find('#grid_'+ this.name +'_rec_bottom').prev();
@@ -2857,8 +2913,7 @@
 			// load more if needed
 			var s = Math.floor(records[0].scrollTop / this.recordHeight);
 			var e = s + Math.floor(records.height() / this.recordHeight);
-			if (e + 20 > this.buffered && this.last.pull_more !== true && this.buffered < this.total - this.offset) {
-				// console.log('more', s, e, this.buffered, this.last.pull_more);
+			if (e + 10 > this.buffered && this.last.pull_more !== true && this.buffered < this.total - this.offset) {
 				if (this.autoLoad === true) {
 					this.last.pull_more = true;
 					this.last.xhr_offset += this.limit;
@@ -2935,10 +2990,10 @@
 						' class="w2ui-selected '+ (lineNum % 2 == 0 ? 'w2ui-even' : 'w2ui-odd') + (record.expanded === true ? ' w2ui-expanded' : '') + '" ' +
 						(summary !== true ?
 							(this.isIOS ?
-								'	onclick  = "w2ui[\''+ this.name +'\'].doDblClick(\''+ record.recid +'\', event);" '
+								'	onclick  = "w2ui[\''+ this.name +'\'].dblClick(\''+ record.recid +'\', event);" '
 								:
-								'	onclick	 = "w2ui[\''+ this.name +'\'].doClick(\''+ record.recid +'\', event);"'+
-								'	ondblclick  = "w2ui[\''+ this.name +'\'].doDblClick(\''+ record.recid +'\', event);" '
+								'	onclick	 = "w2ui[\''+ this.name +'\'].click(\''+ record.recid +'\', event);"'+
+								'	ondblclick  = "w2ui[\''+ this.name +'\'].dblClick(\''+ record.recid +'\', event);" '
 							 )
 							: ''
 						) +
@@ -2949,10 +3004,10 @@
 							'	class="'+ (lineNum % 2 == 0 ? 'w2ui-even' : 'w2ui-odd') + (record.expanded === true ? ' w2ui-expanded' : '') + '" ' +
 						(summary !== true ?
 							(this.isIOS ?
-								'	onclick = "w2ui[\''+ this.name +'\'].doDblClick(\''+ record.recid +'\', event);" '
+								'	onclick = "w2ui[\''+ this.name +'\'].dblClick(\''+ record.recid +'\', event);" '
 								:
-								'	onclick ="w2ui[\''+ this.name +'\'].doClick(\''+ record.recid +'\', event);"'+
-								'	ondblclick = "w2ui[\''+ this.name +'\'].doDblClick(\''+ record.recid +'\', event);" '
+								'	onclick ="w2ui[\''+ this.name +'\'].click(\''+ record.recid +'\', event);"'+
+								'	ondblclick = "w2ui[\''+ this.name +'\'].dblClick(\''+ record.recid +'\', event);" '
 							 )
 							: ''
 						) +
@@ -2972,7 +3027,8 @@
 							'	<div>'+
 							'		<input id="grid_'+ this.name +'_cell_'+ ind +'_select_check" class="grid_select_check" type="checkbox" tabIndex="-1"'+
 							'			'+ (record.selected ? 'checked="checked"' : '') +
-							'			onclick="var obj = w2ui[\''+ this.name +'\']; if (!obj.multiSelect) { obj.selectNone(); }'+
+							'			onclick="var obj = w2ui[\''+ this.name +'\']; '+
+							'				if (!obj.multiSelect) { obj.selectNone(); }'+
 							'				if (this.checked) obj.select(\''+ record.recid + '\'); else obj.unselect(\''+ record.recid + '\'); '+
 							'				if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;">'+
 							'	</div>'
@@ -2998,12 +3054,38 @@
 			}
 			var col_ind = 0;
 			while (true) {
-				var col   = this.columns[col_ind];
+				var col = this.columns[col_ind];
+				var addStyle = '';
 				if (col.hidden) { col_ind++; if (typeof this.columns[col_ind] == 'undefined') break; else continue; }
 				var field = this.parseObj(record, col.field);
 				if (typeof col.render != 'undefined') {
 					if (typeof col.render == 'function') field = col.render.call(this, this.records[ind], ind, col_ind);
 					if (typeof col.render == 'object')   field = col.render[field];
+					if (typeof col.render == 'string') {
+						var tmp = col.render.toLowerCase().split(':');
+						var prefix = '';
+						var suffix = '';
+						if ($.inArray(tmp[0], ['number', 'int', 'float', 'money', 'percent']) != -1) {
+							if (typeof tmp[1] == 'undefined' || !w2utils.isInt(tmp[1])) tmp[1] = 0;
+							if (tmp[1] > 20) tmp[1] = 20;
+							if (tmp[1] < 0)  tmp[1] = 0;
+							if (tmp[0] == 'money')   { tmp[1] = 2; prefix = w2utils.settings.currencySymbol; }
+							if (tmp[0] == 'percent') { suffix = '%'; if (tmp[1] !== '0') tmp[1] = 1; }
+							if (tmp[0] == 'int')	 { tmp[1] = 0; }
+							// format
+							addStyle = 'text-align: right';
+							field 	 = prefix + w2utils.formatNumber(Number(field).toFixed(tmp[1])) + suffix;
+						}
+						if (tmp[0] == 'date') {
+							if (typeof tmp[1] == 'undefined' || tmp[1] == '') tmp[1] = w2utils.settings.date_display;
+							addStyle = 'text-align: center';
+							field 	 = prefix + w2utils.formatDate(field, tmp[1]) + suffix;
+						}
+						if (tmp[0] == 'age') {
+							addStyle = 'text-align: center';
+							field 	 = prefix + w2utils.age(field) + suffix;
+						}
+					}
 				}
 				if (field == null || typeof field == 'undefined') field = '';
 
@@ -3034,10 +3116,10 @@
 								'<input id="grid_'+ this.name +'_edit_'+ ind +'_'+ col_ind +'" value="'+ w2utils.stripTags(field) +'" type="text"  '+
 								'	style="'+ edit.style +'" '+ (record.changed && newValue != '' ? 'class="changed"' : '') +
 								'	field="'+ col.field +'" recid="'+ record.recid +'" line="'+ ind +'" column="'+ col_ind +'" '+
-								'	onclick = "w2ui[\''+ this.name + '\'].doEdit(\'click\', this, event);" '+
-								'	onkeyup = "w2ui[\''+ this.name + '\'].doEdit(\'keyup\', this, event);" '+
-								'	onfocus = "w2ui[\''+ this.name + '\'].doEdit(\'focus\', this, event);" '+
-								'	onblur  = "w2ui[\''+ this.name + '\'].doEdit(\'blur\', this, event);" '+
+								'	onclick = "w2ui[\''+ this.name + '\'].editField(\'click\', this, event);" '+
+								'	onkeyup = "w2ui[\''+ this.name + '\'].editField(\'keyup\', this, event);" '+
+								'	onfocus = "w2ui[\''+ this.name + '\'].editField(\'focus\', this, event);" '+
+								'	onblur  = "w2ui[\''+ this.name + '\'].editField(\'blur\', this, event);" '+
 								'	ondblclick = "if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true; '+
 								'				  this.select();" '+ edit.inTag + ' >' +
 								edit.outTag +
@@ -3045,7 +3127,7 @@
 					}
 				}
 				rec_html += '<td class="w2ui-grid-data" col="'+ col_ind +'" '+
-							'	style="'+ (typeof col.style != 'undefined' ? col.style : '') +'" '+
+							'	style="'+ addStyle + ';' + (typeof col.style != 'undefined' ? col.style : '') +'" '+
 										  (typeof col.attr != 'undefined' ? col.attr : '') +'>'+
 								rec_field +
 							'</td>';
@@ -3088,8 +3170,8 @@
 				$('#grid_'+ obj.name +'_lock').remove();
 				$('#grid_'+ obj.name +'_status').remove();
 				$(this.box).find('> div :first-child').before(
-					'<div id="grid_'+ this.name +'_lock" class="w2ui-grid-lock"></div>'+
-					'<div id="grid_'+ this.name +'_status" class="w2ui-grid-status"></div>'
+					'<div id="grid_'+ this.name +'_lock" class="w2ui-lock"></div>'+
+					'<div id="grid_'+ this.name +'_status" class="w2ui-lock-msg"></div>'
 				);
 				setTimeout(function () {
 					var lock 	= $('#grid_'+ obj.name +'_lock');
@@ -3106,7 +3188,7 @@
 							width 	: '100%',
 							height 	: '100%'
 						});
-						if (showSpinner === true) msg = '<div style="display: inline-block; width: 24px; height: 24px; margin: -3px 8px -7px -10px;" class="w2ui-spinner"></div>' + msg;
+						if (showSpinner === true) msg = '<div class="w2ui-spinner"></div>' + msg;
 						status.html(msg).css({
 							opacity : status.data('old_opacity'),
 							left	: left + 'px',

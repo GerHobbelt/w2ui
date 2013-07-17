@@ -11,14 +11,14 @@ var w2obj = w2obj || {}; // expose object to be able to overwrite default functi
 *
 * == NICE TO HAVE ==
 *	- date has problems in FF new Date('yyyy-mm-dd') breaks
-*	- common onKeydown handler (inactive select can be gray)
 *
 * == 1.3 changes ==
 *	- added locale(..., callBack), fixed bugs
 *	- each widget has name in the box that is name of widget, $(name).w2grid('resize');
 *	- added $().w2marker('string')
 *	- added w2utils.keyboard module
-*	- added w2utils.format()
+*	- added w2utils.formatNumber()
+*	- added w2menu() plugin
 *
 ************************************************/
 
@@ -26,10 +26,11 @@ var w2utils = (function () {
 	var obj = {
 		settings : {
 			"locale"		: "en-us",
-			"date_format"	: "mm/dd/yyyy",
-			"date_display"	: "Mon dd, yyyy",
+			"date_format"	: "m/d/yyyy",
+			"date_display"	: "Mon d, yyyy",
 			"time_format"	: "hh:mi pm",
 			"currency"		: "^[\$\€\£\¥]?[-]?[0-9]*[\.]?[0-9]+$",
+			"currencySymbol": "$",
 			"float"			: "^[-]?[0-9]*[\.]?[0-9]+$",
 			"shortmonths"	: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
 			"fullmonths"	: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
@@ -49,8 +50,8 @@ var w2utils = (function () {
 		age 			: age,
 		date 			: date,
 		size 			: size,
+		formatNumber	: formatNumber,
 		formatDate		: formatDate,
-		format			: format,
 		stripTags		: stripTags,
 		encodeTags		: encodeTags,
 		escapeId		: escapeId,
@@ -94,7 +95,7 @@ var w2utils = (function () {
 		return email.test(val); 
 	}
 
-	function isDate (val, format) {
+	function isDate (val, format, retDate) {
 		if (!val) return false;
 		if (!format) format = w2utils.settings.date_format;
 		// format date
@@ -103,15 +104,19 @@ var w2utils = (function () {
 		var dt   = 'Invalid Date';
 		var month, day, year;
 		if (tmp2 == 'mm/dd/yyyy') { month = tmp[0]; day = tmp[1]; year = tmp[2]; }
+		if (tmp2 == 'm/d/yyyy')   { month = tmp[0]; day = tmp[1]; year = tmp[2]; }
 		if (tmp2 == 'dd/mm/yyyy') { month = tmp[1]; day = tmp[0]; year = tmp[2]; }
+		if (tmp2 == 'd/m/yyyy')   { month = tmp[1]; day = tmp[0]; year = tmp[2]; }
 		if (tmp2 == 'yyyy/dd/mm') { month = tmp[2]; day = tmp[1]; year = tmp[0]; } 
+		if (tmp2 == 'yyyy/d/m')   { month = tmp[2]; day = tmp[1]; year = tmp[0]; } 
 		if (tmp2 == 'yyyy/mm/dd') { month = tmp[1]; day = tmp[2]; year = tmp[0]; } 
+		if (tmp2 == 'yyyy/m/d')   { month = tmp[1]; day = tmp[2]; year = tmp[0]; } 
 		dt = new Date(month + '/' + day + '/' + year);
 		// do checks
 		if (typeof month == 'undefined') return false;
 		if (dt == 'Invalid Date') return false;
 		if ((dt.getMonth()+1 != month) || (dt.getDate() != day) || (dt.getFullYear() != year)) return false;
-		return true;
+		if (retDate === true) return dt; else return true;
 	}
 
 	function isTime (val) {
@@ -131,6 +136,15 @@ var w2utils = (function () {
 		return true;
 	}
 
+	function formatNumber (val) {
+		var ret = '';
+		// check if this is a number
+		if (w2utils.isFloat(val) || w2utils.isInt(val) || w2utils.isMoney(val)) {
+			ret = String(val).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,");
+		}
+		return ret;
+	}
+	
 	function formatDate (dateStr, format) { // IMPORTANT dateStr HAS TO BE valid JavaScript Date String
 		var months = w2utils.settings.shortmonths;
 		var fullMonths = w2utils.settings.fullmonths;
@@ -148,23 +162,19 @@ var w2utils = (function () {
 		var year 	= dt.getFullYear();
 		var month 	= dt.getMonth();
 		var date 	= dt.getDate();
-		var res 	= format.toLowerCase()
-						.replace('yyyy', year)
-						.replace('mm', month+1)
-						.replace('dd', date)
-						.replace('mon', months[month])
-						.replace('month', fullMonths[month]);
-		return res;
+		return format.toLowerCase()
+			.replace('month', w2utils.settings.fullmonths[month])
+			.replace('mon', w2utils.settings.shortmonths[month])
+			.replace(/yyyy/g, year)
+			.replace(/yyy/g, year)
+			.replace(/yy/g, String(year).substr(2))
+			.replace(/(^|[^a-z$])y/g, '$1'+year) 			// only y's that are not preceeded by a letter
+			.replace(/mm/g, (month + 1 < 10 ? '0' : '') + (month + 1))
+			.replace(/dd/g, (date < 10 ? '0' : '') + date)
+			.replace(/(^|[^a-z$])m/g, '$1'+ (month + 1)) 	// only y's that are not preceeded by a letter
+			.replace(/(^|[^a-z$])d/g, '$1' + date); 		// only y's that are not preceeded by a letter
 	}
 
-	function format (numStr) {
-		var ret = '';
-		if (w2utils.isFloat(numStr) || w2utils.isInt(numStr) || w2utils.isMoney(numStr)) {
-			ret = String(numStr).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,");
-		}
-		return ret;
-	}
-	
 	function date (dateStr) {
 		var months = w2utils.settings.shortmonths;
 		if (dateStr == '' || typeof dateStr == 'undefined' || dateStr == null) return '';
@@ -967,7 +977,7 @@ w2utils.keyboard = (function (obj) {
 			if (typeof options.onHide == 'function') options.onHide();
 			$('#w2ui-overlay').remove();
 			$(document).off('click', hide);
-			return;
+			return $(this);
 		}
 		// insert (or re-insert) overlay
 		if ($('#w2ui-overlay').length > 0) { isOpened = true; $(document).off('click', hide); $('#w2ui-overlay').remove(); }
@@ -1013,5 +1023,56 @@ w2utils.keyboard = (function (obj) {
 			$(document).on('click', hide);
 			if (typeof options.onShow == 'function') options.onShow();
 		}, 1);
+
+		return $(this);
 	}
+
+	$.fn.w2menu = function (menu, options) {
+		if (typeof options.select == 'undefined' && typeof options.onSelect == 'function') options.select = options.onSelect;
+		if (typeof options.select != 'function') {
+			console.log('ERROR: options.select is required to be a function, not '+ typeof options.select + ' in $().w2menu(menu, options)');
+			return $(this);
+		}
+		if (!$.isArray(menu)) {
+			console.log('ERROR: first parameter should be an array of objects or strings in $().w2menu(menu, options)');
+			return $(this);
+		}
+		// since only one overlay can exist at a time
+		$.fn.w2menuHandler = function (event, index) {
+			options.select(menu[index], event, index); 
+		}
+		return $(this).w2overlay(getMenuHTML(), options);
+
+		function getMenuHTML () { 
+			var menu_html = '<table cellspacing="0" cellpadding="0" class="w2ui-drop-menu">';
+			for (var f = 0; f < menu.length; f++) { 
+				var mitem = menu[f];
+				if (typeof mitem == 'string') {
+					var tmp = mitem.split('|');
+					// 1 - id, 2 - text, 3 - image, 4 - icon
+					mitem = { id: tmp[0], text: tmp[0], img: null, icon: null };
+					if (tmp[1]) mitem.text = tmp[1];
+					if (tmp[2]) mitem.img  = tmp[2];
+					if (tmp[3]) mitem.icon = tmp[3];
+				} else {
+					if (typeof mitem.text != 'undefined' && typeof mitem.id == 'undefined') mitem.id = mitem.text;
+					if (typeof mitem.text == 'undefined' && typeof mitem.id != 'undefined') mitem.text = mitem.id;
+					if (typeof mitem.caption != 'undefined') mitem.text = mitem.caption;
+					if (typeof mitem.img == 'undefined') mitem.img = null;
+					if (typeof mitem.icon == 'undefined') mitem.icon = null;
+				}
+				var img = '<td>&nbsp;</td>';
+				if (mitem.img)  img = '<td><div class="w2ui-tb-image w2ui-icon '+ mitem.img +'"></div></td>';
+				if (mitem.icon) img = '<td align="center"><div class="w2ui-tb-image"><span class="'+ mitem.icon +'"></span></div></td>';
+				menu_html += 
+					'<tr onmouseover="$(this).addClass(\'w2ui-selected\');" onmouseout="$(this).removeClass(\'w2ui-selected\');" '+
+					'		onclick="$(document).click(); $.fn.w2menuHandler(event, \''+ f +'\');">'+
+						img +
+					'	<td>'+ mitem.text +'</td>'+
+					'</tr>';
+			}
+			menu_html += "</table>";
+			return menu_html;
+		}	
+	}	
 })();

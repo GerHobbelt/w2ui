@@ -14,6 +14,7 @@ a small footprint and no dependencies except jQuery. The library has the followi
 
 The complete library is only **42Kb** (minified & gzipped)
 
+
 ## Quick Start
 
 Current stable version is 1.2. You can download it from here: [http://w2ui.com](http://w2ui.com).
@@ -31,6 +32,7 @@ format from the server (or write a converter into JSON format on the client).
 
 [Getting Started Guide](http://w2ui.com/web/get-started)
 
+
 ## Documentation & Demos
 
 You can find documentation and demos here:
@@ -38,10 +40,12 @@ You can find documentation and demos here:
 * [http://w2ui.com/web/docs](http://w2ui.com/web/docs) - documentation
 * [http://w2ui.com/web/demos](http://w2ui.com/web/demos) - demos
 
+
 ## Bug Tracking
 
 Have a bug or a feature request? Please open an issue here [https://github.com/vitmalina/w2ui/issues](https://github.com/vitmalina/w2ui/issues).
 Please make sure that the same issue was not previously submitted by someone else.
+
 
 ## Building
 
@@ -54,18 +58,34 @@ I use ANT to build the project. It does the following
 In order to be able to use ANT, you will need to install Node.JS and NPM on your machine, then run the following command to install dependencies
 
 ```
-npm install
+sudo npm install less -g
+sudo npm install clean-css -g
+sudo npm install uglify-js@1 -g
 ```
+
 
 ## File Structure
 
-This repository holds a lot of auxiliary
+This repository holds a lot of auxiliary files. 
 
 ```
-- css 			- compiled CSS files
+- css 			- compiled CSS files 
   - less 		- LESS files (source for css)
 - demos 		- all demos, same as on the website
 - js 			- compiled JS files, plus additional JS libraries
 - src 			- source JS files
 - test 			- feature testing files
 ```
+
+
+## Contributing
+
+Your contributions are welcome. However, few things you need to know before contribution:
+
+1. Please check out latest code before changing anything. It is harder to merge if your changes will not merge clean.
+2. If you are changing JS files - do all changes in /src folder
+3. If you are changing CSS files - do all changes in LESS in /css/less/src
+4. If you want to help with unit test - do all changes in /test/qunit
+5. If you want to change documenation - do all chnages in /docs
+6. If you want to add demos - do all changes in /demos
+

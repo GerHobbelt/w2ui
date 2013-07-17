@@ -8,7 +8,6 @@
 * == NICE TO HAVE ==
 *	- onResize for the panel
 *	- problem with layout.html (see in 1.3)
-*	- add layout.lock(), unlock()
 *
 * == 1.3 changes ==
 *   - tabs can be array of string, array of tab objects or w2tabs object
@@ -19,6 +18,8 @@
 *	- % base resizes
 *	- better min/max calculation when window resizes
 *	- moved some settings to prototype
+*	- added layout.lock(panel, msg, [showSpinner]), unlock(panel)
+*	- rename startResize -> resizeStart, stopResize -> resizeStop, doResize -> resizeMove
 * 
 ************************************************************************/
 
@@ -28,7 +29,7 @@
 		this.name		= null;		// unique name for w2ui
 		this.panels		= [];
 
-		this.padding	= 0;		// panel padding
+		this.padding	= 1;		// panel padding
 		this.resizer	= 4;		// resizer width or height
 		this.style		= '';
 		this.css		= '';		// will display all inside <style> tag
@@ -140,7 +141,7 @@
 							var div1 = $('#'+ nm + ' > .w2ui-panel-content');
 							div1.after('<div class="w2ui-panel-content new-panel" style="'+ div1[0].style.cssText +'"></div>');
 							var div2 = $('#'+ nm + ' > .w2ui-panel-content.new-panel');
-							if (typeof(data) == 'object') {
+							if (typeof data == 'object') {
 								data.box = div2[0]; // do not do .render(box);
 								data.render();
 							} else {
@@ -327,96 +328,101 @@
 		},
 				
 		render: function (box) {
+			var obj = this;
 			if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection 
 			var time = (new Date()).getTime();
 			// event before
-			var eventData = this.trigger({ phase: 'before', type: 'render', target: this.name, box: box });	
+			var eventData = obj.trigger({ phase: 'before', type: 'render', target: obj.name, box: box });	
 			if (eventData.stop === true) return false;
 	
 			if (typeof box != 'undefined' && box != null) { 
-				if ($(this.box).find('#layout_'+ this.name +'_panel_main').length > 0) {
-					$(this.box)
+				if ($(obj.box).find('#layout_'+ obj.name +'_panel_main').length > 0) {
+					$(obj.box)
 						.removeAttr('name')
 						.removeClass('w2ui-layout')
 						.html('');
 				}
-				this.box = box;
+				obj.box = box;
 			}
-			if (!this.box) return false;
-			$(this.box)
-				.attr('name', this.name)
+			if (!obj.box) return false;
+			$(obj.box)
+				.attr('name', obj.name)
 				.addClass('w2ui-layout')
 				.html('<div></div>');
-			if ($(this.box).length > 0) $(this.box)[0].style.cssText += this.style;
+			if ($(obj.box).length > 0) $(obj.box)[0].style.cssText += obj.style;
 			// create all panels
 			var tmp = ['top', 'left', 'main', 'preview', 'right', 'bottom'];
 			for (var t in tmp) {
-				var pan  = this.get(tmp[t]);
-				var html =  '<div id="layout_'+ this.name + '_panel_'+ tmp[t] +'" class="w2ui-panel">'+
+				var pan  = obj.get(tmp[t]);
+				var html =  '<div id="layout_'+ obj.name + '_panel_'+ tmp[t] +'" class="w2ui-panel">'+
 							'	<div class="w2ui-panel-tabs"></div>'+
 							'	<div class="w2ui-panel-toolbar"></div>'+
 							'	<div class="w2ui-panel-content"></div>'+
 							'</div>'+
-							'<div id="layout_'+ this.name + '_resizer_'+ tmp[t] +'" class="w2ui-resizer"></div>';
-				$(this.box).find(' > div').append(html);
-				// if there are tabs and/or toolbar - render it
-				if (pan.tabs != null) $(this.box).find('#layout_'+ this.name + '_panel_'+ tmp[t] +' .w2ui-panel-tabs').w2render(pan.tabs);
-				if (pan.toolbar != null) $(this.box).find('#layout_'+ this.name + '_panel_'+ tmp[t] +' .w2ui-panel-toolbar').w2render(pan.toolbar);
+							'<div id="layout_'+ obj.name + '_resizer_'+ tmp[t] +'" class="w2ui-resizer"></div>';
+				$(obj.box).find(' > div').append(html);
+				// tabs are rendered in refresh()
 			}
-			$(this.box).find(' > div')
-				.append('<style id="layout_'+ this.name + '_panel_css" style="position: absolute; top: 10000px;">'+ this.css +'</style>');		
+			$(obj.box).find(' > div')
+				.append('<style id="layout_'+ obj.name + '_panel_css" style="position: absolute; top: 10000px;">'+ obj.css +'</style>');		
 			// process event
-			this.trigger($.extend(eventData, { phase: 'after' }));	
+			obj.trigger($.extend(eventData, { phase: 'after' }));	
 			// reinit events
-			this.refresh();
-			this.initEvents();
+			setTimeout(function () { // needed this timeout to allow browser to render first if there are tabs or toolbar
+				obj.refresh();
+				obj.resize();
+				obj.initEvents();
+			}, 0);
 			return (new Date()).getTime() - time;
 		},
 		
 		refresh: function (panel) {
+			var obj = this;
 			if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection 
 			if (typeof panel == 'undefined') panel = null;
 			var time = (new Date()).getTime();
 			// event before
-			var eventData = this.trigger({ phase: 'before', type: 'refresh', target: (typeof panel != 'undefined' ? panel : this.name), panel: this.get(panel) });	
+			var eventData = obj.trigger({ phase: 'before', type: 'refresh', target: (typeof panel != 'undefined' ? panel : obj.name), panel: obj.get(panel) });	
 			if (eventData.stop === true) return;
 	
+			obj.unlock(panel);
 			if (panel != null && typeof panel != 'undefined') {
-				var p = this.get(panel);
+				var p = obj.get(panel);
 				if (p == null) return;
 				// apply properties to the panel
-				var el = $('#layout_'+ this.name +'_panel_'+ panel).css({ display: p.hidden ? 'none' : 'block' });
+				var el = $('#layout_'+ obj.name +'_panel_'+ panel).css({ display: p.hidden ? 'none' : 'block' });
 				el = el.find('.w2ui-panel-content');
 				if (el.length > 0) el.css('overflow', p.overflow)[0].style.cssText += ';' + p.style;
 				// insert content
 				if (typeof p.content == 'object' && p.content.render) {
-					p.content.render($('#layout_'+ this.name + '_panel_'+ p.type +' > .w2ui-panel-content')[0]);
+					p.content.box = $('#layout_'+ obj.name + '_panel_'+ p.type +' > .w2ui-panel-content')[0];
+					p.content.render(); // do not do .render(box);
 				} else {
-					$('#layout_'+ this.name + '_panel_'+ p.type +' > .w2ui-panel-content').html(p.content);
+					$('#layout_'+ obj.name + '_panel_'+ p.type +' > .w2ui-panel-content').html(p.content);
 				}
 				// if there are tabs and/or toolbar - render it
-				var tmp = $(this.box).find('#layout_'+ this.name + '_panel_'+ p.type +' .w2ui-panel-tabs');
+				var tmp = $(obj.box).find('#layout_'+ obj.name + '_panel_'+ p.type +' .w2ui-panel-tabs');
 				if (p.tabs != null) { 
 					if (tmp.find('[name='+ p.tabs.name +']').length == 0) tmp.w2render(p.tabs); else p.tabs.refresh(); 
 				} else {
 					tmp.html('').removeClass('w2ui-tabs').hide();
 				}
-				var tmp = $(this.box).find('#layout_'+ this.name + '_panel_'+ p.type +' .w2ui-panel-toolbar');
+				var tmp = $(obj.box).find('#layout_'+ obj.name + '_panel_'+ p.type +' .w2ui-panel-toolbar');
 				if (p.toolbar != null) { 
 					if (tmp.find('[name='+ p.toolbar.name +']').length == 0) tmp.w2render(p.toolbar); else p.toolbar.refresh(); 
 				} else {
 					tmp.html('').removeClass('w2ui-toolbar').hide();
 				}
 			} else {
-				if ($('#layout_' +this.name +'_panel_main').length <= 0) {
-					this.render();
+				if ($('#layout_' +obj.name +'_panel_main').length <= 0) {
+					obj.render();
 					return;
 				}
-				this.resize();
+				obj.resize();
 				// refresh all of them
-				for (var p in this.panels) { this.refresh(this.panels[p].type); }
+				for (var p in this.panels) { obj.refresh(this.panels[p].type); }
 			}
-			this.trigger($.extend(eventData, { phase: 'after' }));	
+			obj.trigger($.extend(eventData, { phase: 'after' }));	
 			return (new Date()).getTime() - time;
 		},
 		
@@ -494,7 +500,7 @@
 						'height': h + 'px',
 						'cursor': 'ns-resize'
 					}).bind('mousedown', function (event) {
-						w2ui[obj.name].startResize('top', event);
+						w2ui[obj.name].resizeStart('top', event);
 						return false;
 					});
 				}
@@ -531,7 +537,7 @@
 						'height': h + 'px',
 						'cursor': 'ew-resize'
 					}).bind('mousedown', function (event) {
-						w2ui[obj.name].startResize('left', event);
+						w2ui[obj.name].resizeStart('left', event);
 						return false;
 					});
 				}
@@ -567,7 +573,7 @@
 						'height': h + 'px',
 						'cursor': 'ew-resize'
 					}).bind('mousedown', function (event) {
-						w2ui[obj.name].startResize('right', event);
+						w2ui[obj.name].resizeStart('right', event);
 						return false;
 					});
 				}			
@@ -601,7 +607,7 @@
 						'height': h + 'px',
 						'cursor': 'ns-resize'
 					}).bind('mousedown', function (event) {
-						w2ui[obj.name].startResize('bottom', event);
+						w2ui[obj.name].resizeStart('bottom', event);
 						return false;
 					});
 				}
@@ -658,7 +664,7 @@
 						'height': h + 'px',
 						'cursor': 'ns-resize'
 					}).bind('mousedown', function (event) {
-						w2ui[obj.name].startResize('preview', event);
+						w2ui[obj.name].resizeStart('preview', event);
 						return false;
 					});
 				}
@@ -686,8 +692,13 @@
 			clearTimeout(this._resize_timer);
 			this._resize_timer = setTimeout(function () {
 				for (var e in w2ui) {
-					// do not sent resize to panels, or it will get caught in a loop
-					if (typeof w2ui[e].resize == 'function' && typeof w2ui[e].panels == 'undefined') w2ui[e].resize();
+					if (typeof w2ui[e].resize == 'function') {
+						// sent to all none-layouts
+						if (w2ui[e].panels == 'undefined') w2ui[e].resize();
+						// only send to nested layouts
+						var parent = $(w2ui[e].box).parents('.w2ui-layout');
+						if (parent.length > 0 && parent.attr('name') == obj.name) w2ui[e].resize();
+					}
 				}
 			}, 100);		
 			this.trigger($.extend(eventData, { phase: 'after' }));
@@ -716,6 +727,61 @@
 			
 			return true;
 		},
+
+		lock: function (panel, msg, showSpinner) {
+			var obj = this;
+			if (panel == null) return;
+			if (!msg && msg != 0) msg = '';
+			if ($.inArray(panel, ['left', 'right', 'top', 'bottom', 'preview', 'main']) == -1) {
+				console.log('ERROR: First parameter needs to be the a valid panel name.');
+				return;
+			}
+			var nm = '#layout_'+ obj.name + '_panel_' + panel;
+			if (!msg) {
+				setTimeout(function () {
+					$(nm +'_lock').remove();
+					$(nm +'_status').remove();
+				}, 25);
+			} else {
+				if (obj.get(panel).hidden == true && msg != '') {
+					console.log('ERROR: Cannot lock '+ panel +' panel because it is not visible.');
+					return;
+				}
+				$(nm +'_lock').remove();
+				$(nm +'_status').remove();
+				$(nm).find('> :first-child').before(
+					'<div id="'+ nm.substr(1) +'_lock" class="w2ui-lock"></div>'+
+					'<div id="'+ nm.substr(1) +'_status" class="w2ui-lock-msg"></div>'
+				);
+				setTimeout(function () {
+					var lock 	= $(nm +'_lock');
+					var status 	= $(nm +'_status');
+					status.data('old_opacity', status.css('opacity')).css('opacity', '0').show();
+					lock.data('old_opacity', lock.css('opacity')).css('opacity', '0').show();
+					setTimeout(function () {
+						var left 	= ($(nm).width()  - w2utils.getSize(status, 'width')) / 2;
+						var top 	= ($(nm).height() * 0.9 - w2utils.getSize(status, 'height')) / 2;
+						lock.css({
+							opacity : lock.data('old_opacity'),
+							left 	: '0px',
+							top 	: '0px',
+							width 	: '100%',
+							height 	: '100%'
+						});
+						if (showSpinner === true) msg = '<div class="w2ui-spinner"></div>' + msg;
+						status.html(msg).css({
+							opacity : status.data('old_opacity'),
+							left	: left + 'px',
+							top		: top + 'px'
+						});
+					}, 10);
+				}, 10);
+			}
+		},
+
+		unlock: function (panel) { 
+			this.lock(panel); 
+		},		
 		
 		// --- INTERNAL FUNCTIONS
 		
@@ -727,19 +793,18 @@
 					w2ui[obj.name].resize()	
 				},
 				mousemove : function (event) { 
-					w2ui[obj.name].doResize(event)	
+					w2ui[obj.name].resizeMove(event)	
 				},
 				mouseup : function (event) { 
-					w2ui[obj.name].stopResize(event)	
+					w2ui[obj.name].resizeStop(event)	
 				}
 			};
-			
 			$(window).on('resize', this.events.resize);
 			$(document).on('mousemove', this.events.mousemove);
 			$(document).on('mouseup', this.events.mouseup);
 		},
 	
-		startResize: function (type, evnt) {
+		resizeStart: function (type, evnt) {
 			if (!this.box) return;
 			if (!evnt) evnt = window.event;
 			if (!window.addEventListener) { window.document.attachEvent('onselectstart', function() { return false; } ); }
@@ -756,7 +821,7 @@
 			}
 		},
 	
-		doResize: function (evnt) {
+		resizeMove: function (evnt) {
 			if (!this.box) return;
 			if (!evnt) evnt = window.event;
 			if (typeof this.tmp_resizing == 'undefined') return;
@@ -821,7 +886,7 @@
 			this.trigger($.extend(eventData, { phase: 'after' }));	
 		},
 	
-		stopResize: function (evnt) {
+		resizeStop: function (evnt) {
 			if (!this.box) return;
 			if (!evnt) evnt = window.event;
 			if (!window.addEventListener) { window.document.attachEvent('onselectstart', function() { return false; } ); }

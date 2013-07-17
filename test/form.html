@@ -21,18 +21,19 @@
 				{ id: 'tab2', caption: 'Additional' }
 			],
 			record: {
-				"field.date": '15/3/2013'
+				"field.date": '15/3/2013',
+				"field.listurl": null
 			},
 			fields: [
 				{ name: 'field.text', type: 'text', required: true },
 				{ name: 'field.alpha', type: 'alphanumeric', required: true },
 				{ name: 'field.int', type: 'int', required: true },
 				{ name: 'field.float', type: 'float', required: true },
-				{ name: 'field.date', type: 'date', options: { format: 'dd/mm/yyyy', blocked: ['3/12/2013', '3/13/2013'] } },
+				{ name: 'field.date', type: 'date', options: { format: 'd/m/yyyy', blocked: ['3/12/2013', '3/13/2013'] } },
 				{ name: 'field.list', type: 'list', required: true, 
 					options: { items: [{ id: 0, txt: 'Adams, John' }, { id: 1, text: 'Adams2, John' }], showNone: false } },
 				{ name: 'field.listurl', type: 'list', required: true, 
-						options: { url : 'listdat.json', showNone: false } },
+						options: { url : 'listdat.json', showNone: true } },
 				{ name: 'field.enum', type: 'enum', required: true, 
 					options: { items: [{id: 1, text: 'Adams, John'}, 'Johnson, Peter', 'Lewis, Frank', 'Cruz, Steve', 'Donnun, Nick'] } },
 				{ name: 'field.upload', type: 'upload', required: false, 
