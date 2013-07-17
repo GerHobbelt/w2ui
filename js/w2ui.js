@@ -1092,7 +1092,7 @@ w2utils.keyboard = (function (obj) {
 *	- save grid state into localStorage and restore
 *	- search logic (AND or OR) if it is a list, it should be multiple list with or
 *	- easy bubbles in the grid
-*	- render: 'number', 'date', 'time', 'datetime', 'money', 
+*	- possibly add context menu similar to sidebar's
 *
 * == 1.3 changes ==
 *	- added onEdit, an event to catch the edit record event when you click the edit button
@@ -7581,6 +7581,7 @@ w2utils.keyboard = (function (obj) {
 						break;
 
 					case 'text':
+						// intentionally left blank
 						break;
 
 					case 'int':
@@ -8065,6 +8066,10 @@ w2utils.keyboard = (function (obj) {
 							}
 						}
 						this.refresh();
+						break;
+
+					case 'slider' :
+						// for future reference
 						break;
 
 					default: 
