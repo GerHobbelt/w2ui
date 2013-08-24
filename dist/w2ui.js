@@ -8838,10 +8838,6 @@ w2utils.keyboard = (function (obj) {
 						// for future reference
 						break;
 
-					case 'slider' :
-						// for future reference
-						break;
-
 					default: 
 						console.log('ERROR: w2field does not recognize "'+ options.type + '" field type.');
 						break;
