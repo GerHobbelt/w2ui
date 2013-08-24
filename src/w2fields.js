@@ -300,7 +300,7 @@
 							showAll		: false,	// if true then show selected item in drop down
 							maxCache 	: 500,		// number items to cache
 							onRender 	: null,		// -- not implemented
-							onSelect 	: null		// -- not implemented
+							onSelect 	: null		// -- not implemented (you can use onChange for the input)
 						}
 						var obj	= this;
 						var settings = $.extend({}, defaults, options);
@@ -498,11 +498,13 @@
 								var previewHTML = "";
 								if ((/image/i).test(file.type)) { // image
 									previewHTML = '<div style="padding: 2px;">'+
-										'	<img src="##FILE##" onload="var w = $(this).width(); var h = $(this).height(); '+
-										'		if (w < 300 & h < 300) return; '+
-										'		if (w >= h && w > 300) $(this).width(300);'+
-										'		if (w < h && h > 300) $(this).height(300);'+
-										'	" onerror="this.style.display = \'none\'">'+
+										'	<img src="##FILE##" style="max-width: 300px;" '+
+										'		onload="var w = $(this).width(); var h = $(this).height(); '+
+										'			if (w < 300 & h < 300) return; '+
+										'			if (w >= h && w > 300) $(this).width(300);'+
+										'			if (w < h && h > 300) $(this).height(300);"'+
+										'		onerror="this.style.display = \'none\'"'+
+										'	>'+
 										'</div>';
 								}
 								var td1 = 'style="padding: 3px; text-align: right; color: #777;"';
@@ -556,7 +558,7 @@
 						this.refresh();
 						break;
 
-					case 'slider' :
+					case 'slider':
 						// for future reference
 						break;
 
@@ -662,7 +664,11 @@
 						return;
 					}
 					if (event.target.tagName != 'INPUT') {
-						$(div).find('.file-input').click();
+						var settings = $(obj).data('settings');
+						var selected = $(obj).data('selected');
+						var cnt  = 0;
+						for (var s in selected) { cnt++; }
+						if (cnt<settings.max) $(div).find('.file-input').click();
 					}
 				})
 				.off('dragenter')

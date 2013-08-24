@@ -11,6 +11,9 @@ var w2obj = w2obj || {}; // expose object to be able to overwrite default functi
 *
 * == NICE TO HAVE ==
 *	- date has problems in FF new Date('yyyy-mm-dd') breaks
+*	- bug: w2utils.formatDate('2011-31-01', 'yyyy-dd-mm'); - wrong foratter
+*	- overlay should be displayed where more space (on top or on bottom)
+* 	- write and article how to replace certail framework functions
 *
 * == 1.3 changes ==
 *	- added locale(..., callBack), fixed bugs
@@ -19,6 +22,7 @@ var w2obj = w2obj || {}; // expose object to be able to overwrite default functi
 *	- added w2utils.keyboard module
 *	- added w2utils.formatNumber()
 *	- added w2menu() plugin
+*	- added formatTime(), formatDateTime()
 *
 ************************************************/
 
@@ -52,6 +56,8 @@ var w2utils = (function () {
 		size 			: size,
 		formatNumber	: formatNumber,
 		formatDate		: formatDate,
+		formatTime  	: formatTime,
+		formatDateTime  : formatDateTime,
 		stripTags		: stripTags,
 		encodeTags		: encodeTags,
 		escapeId		: escapeId,
@@ -136,6 +142,85 @@ var w2utils = (function () {
 		return true;
 	}
 
+	function age (timeStr) {
+		if (timeStr == '' || typeof timeStr == 'undefined' || timeStr == null) return '';
+		if (w2utils.isInt(timeStr)) timeStr = Number(timeStr); // for unix timestamps
+		
+		var d1 = new Date(timeStr);
+		if (w2utils.isInt(timeStr)) d1 = new Date(Number(timeStr)); // for unix timestamps
+		var tmp = String(timeStr).split('-');
+		if (tmp.length == 3) d1 = new Date(tmp[0], Number(tmp[1])-1, tmp[2]); // yyyy-mm-dd
+		var tmp = String(timeStr).split('/');
+		if (tmp.length == 3) d1 = new Date(tmp[2], Number(tmp[0])-1, tmp[1]); // mm/dd/yyyy
+		if (d1 == 'Invalid Time') return '';
+
+		var d2  = new Date();
+		var sec = (d2.getTime() - d1.getTime()) / 1000;
+		var amount = '';
+		var type   = '';
+		
+		if (sec < 60) {
+			amount = Math.floor(sec);
+			type   = 'sec';
+			if (sec < 0) { amount = 0; type = 'sec' }
+		} else if (sec < 60*60) {
+			amount = Math.floor(sec/60);
+			type   = 'min';
+		} else if (sec < 24*60*60) {
+			amount = Math.floor(sec/60/60);
+			type   = 'hour';
+		} else if (sec < 30*24*60*60) {
+			amount = Math.floor(sec/24/60/60);
+			type   = 'day';
+		} else if (sec < 12*30*24*60*60) {
+			amount = Math.floor(sec/30/24/60/60*10)/10;
+			type   = 'month';
+		} else if (sec >= 12*30*24*60*60) {
+			amount = Math.floor(sec/12/30/24/60/60*10)/10;
+			type   = 'year';
+		}		
+		return amount + ' ' + type + (amount > 1 ? 's' : '');
+	}	
+		
+	function date (dateStr) {
+		var months = w2utils.settings.shortmonths;
+		if (dateStr == '' || typeof dateStr == 'undefined' || dateStr == null) return '';
+		if (w2utils.isInt(dateStr)) dateStr = Number(dateStr); // for unix timestamps
+		
+		var d1 = new Date(dateStr);
+		if (w2utils.isInt(dateStr)) d1 = new Date(Number(dateStr)); // for unix timestamps
+		var tmp = String(dateStr).split('-');
+		if (tmp.length == 3) d1 = new Date(tmp[0], Number(tmp[1])-1, tmp[2]); // yyyy-mm-dd
+		var tmp = String(dateStr).split('/');
+		if (tmp.length == 3) d1 = new Date(tmp[2], Number(tmp[0])-1, tmp[1]); // mm/dd/yyyy
+		if (d1 == 'Invalid Date') return '';
+
+		var d2   = new Date(); // today
+		var d3   = new Date(); 
+		d3.setTime(d3.getTime() - 86400000); // yesterday
+		
+		var dd1  = months[d1.getMonth()] + ' ' + d1.getDate() + ', ' + d1.getFullYear();
+		var dd2  = months[d2.getMonth()] + ' ' + d2.getDate() + ', ' + d2.getFullYear();
+		var dd3  = months[d3.getMonth()] + ' ' + d3.getDate() + ', ' + d3.getFullYear();
+		
+		var time = (d1.getHours() - (d1.getHours() > 12 ? 12 :0)) + ':' + (d1.getMinutes() < 10 ? '0' : '') + d1.getMinutes() + ' ' + (d1.getHours() >= 12 ? 'pm' : 'am');
+		var time2= (d1.getHours() - (d1.getHours() > 12 ? 12 :0)) + ':' + (d1.getMinutes() < 10 ? '0' : '') + d1.getMinutes() + ':' + (d1.getSeconds() < 10 ? '0' : '') + d1.getSeconds() + ' ' + (d1.getHours() >= 12 ? 'pm' : 'am');
+		var dsp = dd1;
+		if (dd1 == dd2) dsp = time;
+		if (dd1 == dd3) dsp = w2utils.lang('Yesterday');
+
+		return '<span title="'+ dd1 +' ' + time2 +'">'+ dsp +'</span>';
+	}
+
+	function size (sizeStr) {
+		if (!w2utils.isFloat(sizeStr) || sizeStr == '') return '';
+		sizeStr = parseFloat(sizeStr);
+		if (sizeStr == 0) return 0;
+		var sizes = ['Bt', 'KB', 'MB', 'GB', 'TB'];
+		var i = parseInt( Math.floor( Math.log(sizeStr) / Math.log(1024) ) );
+		return (Math.floor(sizeStr / Math.pow(1024, i) * 10) / 10).toFixed(i == 0 ? 0 : 1) + ' ' + sizes[i];
+	}
+
 	function formatNumber (val) {
 		var ret = '';
 		// check if this is a number
@@ -175,83 +260,49 @@ var w2utils = (function () {
 			.replace(/(^|[^a-z$])d/g, '$1' + date); 		// only y's that are not preceeded by a letter
 	}
 
-	function date (dateStr) {
+
+	function formatTime (dateStr, format) { // IMPORTANT dateStr HAS TO BE valid JavaScript Date String
 		var months = w2utils.settings.shortmonths;
-		if (dateStr == '' || typeof dateStr == 'undefined' || dateStr == null) return '';
-		if (w2utils.isInt(dateStr)) dateStr = Number(dateStr); // for unix timestamps
-		
-		var d1 = new Date(dateStr);
-		if (w2utils.isInt(dateStr)) d1 = new Date(Number(dateStr)); // for unix timestamps
-		var tmp = String(dateStr).split('-');
-		if (tmp.length == 3) d1 = new Date(tmp[0], Number(tmp[1])-1, tmp[2]); // yyyy-mm-dd
-		var tmp = String(dateStr).split('/');
-		if (tmp.length == 3) d1 = new Date(tmp[2], Number(tmp[0])-1, tmp[1]); // mm/dd/yyyy
-		if (d1 == 'Invalid Date') return '';
+		var fullMonths = w2utils.settings.fullmonths;
+		if (typeof format == 'undefined') format = this.settings.time_format;
+		if (typeof dateStr == 'undefined' || dateStr == '' || dateStr == null) return '';
 
-		var d2   = new Date(); // today
-		var d3   = new Date(); 
-		d3.setTime(d3.getTime() - 86400000); // yesterday
-		
-		var dd1  = months[d1.getMonth()] + ' ' + d1.getDate() + ', ' + d1.getFullYear();
-		var dd2  = months[d2.getMonth()] + ' ' + d2.getDate() + ', ' + d2.getFullYear();
-		var dd3  = months[d3.getMonth()] + ' ' + d3.getDate() + ', ' + d3.getFullYear();
-		
-		var time = (d1.getHours() - (d1.getHours() > 12 ? 12 :0)) + ':' + (d1.getMinutes() < 10 ? '0' : '') + d1.getMinutes() + ' ' + (d1.getHours() >= 12 ? 'pm' : 'am');
-		var time2= (d1.getHours() - (d1.getHours() > 12 ? 12 :0)) + ':' + (d1.getMinutes() < 10 ? '0' : '') + d1.getMinutes() + ':' + (d1.getSeconds() < 10 ? '0' : '') + d1.getSeconds() + ' ' + (d1.getHours() >= 12 ? 'pm' : 'am');
-		var dsp = dd1;
-		if (dd1 == dd2) dsp = time;
-		if (dd1 == dd3) dsp = w2utils.lang('Yesterday');
+		var dt = new Date(dateStr);
+		if (w2utils.isInt(dateStr)) dt = new Date(Number(dateStr)); // for unix timestamps
+		if (dt == 'Invalid Date') return '';
 
-		return '<span title="'+ dd1 +' ' + time2 +'">'+ dsp +'</span>';
+		var type = 'am';
+		var hour = dt.getHours();
+		var h24  = dt.getHours();
+		var min  = dt.getMinutes();
+		var sec  = dt.getSeconds();
+		if (min < 10) min = '0' + min;
+		if (sec < 10) sec = '0' + sec;
+		if (format.indexOf('am') != -1 || format.indexOf('pm') != -1) {
+			if (hour >= 12) type = 'pm'; 
+			if (hour > 12)  hour = hour - 12;
+		}
+		return format.toLowerCase()
+			.replace('am', type)
+			.replace('pm', type)
+			.replace('hh', hour)
+			.replace('h24', h24)
+			.replace('mm', min)
+			.replace('mi', min)
+			.replace('ss', sec)
+			.replace(/(^|[^a-z$])h/g, '$1' + hour) 	// only y's that are not preceeded by a letter
+			.replace(/(^|[^a-z$])m/g, '$1' + min) 	// only y's that are not preceeded by a letter
+			.replace(/(^|[^a-z$])s/g, '$1' + sec); 	// only y's that are not preceeded by a letter
 	}
 
-	function age (timeStr) {
-		if (timeStr == '' || typeof timeStr == 'undefined' || timeStr == null) return '';
-		if (w2utils.isInt(timeStr)) timeStr = Number(timeStr); // for unix timestamps
-		
-		var d1 = new Date(timeStr);
-		if (w2utils.isInt(timeStr)) d1 = new Date(Number(timeStr)); // for unix timestamps
-		var tmp = String(timeStr).split('-');
-		if (tmp.length == 3) d1 = new Date(tmp[0], Number(tmp[1])-1, tmp[2]); // yyyy-mm-dd
-		var tmp = String(timeStr).split('/');
-		if (tmp.length == 3) d1 = new Date(tmp[2], Number(tmp[0])-1, tmp[1]); // mm/dd/yyyy
-		if (d1 == 'Invalid Time') return '';
-
-		var d2  = new Date();
-		var sec = (d2.getTime() - d1.getTime()) / 1000;
-		var amount = '';
-		var type   = '';
-		
-		if (sec < 60) {
-			amount = Math.floor(sec);
-			type   = 'sec';
-			if (sec < 0) { amount = 0; type = 'sec' }
-		} else if (sec < 60*60) {
-			amount = Math.floor(sec/60);
-			type   = 'min';
-		} else if (sec < 24*60*60) {
-			amount = Math.floor(sec/60/60);
-			type   = 'hour';
-		} else if (sec < 30*24*60*60) {
-			amount = Math.floor(sec/24/60/60*10)/10;
-			type   = 'day';
-		} else if (sec < 12*30*24*60*60) {
-			amount = Math.floor(sec/30/24/60/60*10)/10;
-			type   = 'month';
-		} else if (sec >= 12*30*24*60*60) {
-			amount = Math.floor(sec/12/30/24/60/60*10)/10;
-			type   = 'year';
-		}		
-		return amount + ' ' + type + (amount > 1 ? 's' : '');
-	}	
-		
-	function size (sizeStr) {
-		if (!w2utils.isFloat(sizeStr) || sizeStr == '') return '';
-		sizeStr = parseFloat(sizeStr);
-		if (sizeStr == 0) return 0;
-		var sizes = ['Bt', 'KB', 'MB', 'GB', 'TB'];
-		var i = parseInt( Math.floor( Math.log(sizeStr) / Math.log(1024) ) );
-		return (Math.floor(sizeStr / Math.pow(1024, i) * 10) / 10).toFixed(i == 0 ? 0 : 1) + ' ' + sizes[i];
+	function formatDateTime(dateStr, format) {
+		var fmt;
+		if (typeof format != 'string') {
+			var fmt = [this.settings.date_format, this.settings.time_format];
+		} else {
+			var fmt = format.split('|');
+		}
+		return this.formatDate(dateStr, fmt[0]) + ' ' + this.formatTime(dateStr, fmt[1]);
 	}
 
 	function stripTags (html) {
@@ -680,6 +731,7 @@ var w2utils = (function () {
 			url		: locale.path + '/'+ locale.lang.toLowerCase() +'.json',
 			type	: "GET",
 			dataType: "JSON",
+			async	: false,
 			cache 	: false,
 			success : function (data, status, xhr) {
 				w2utils.settings = $.extend(true, w2utils.settings, data);
@@ -797,8 +849,9 @@ w2utils.keyboard = (function (obj) {
 	// private scope
 	var w2ui_name = null;
 
-	obj.register	= register;
 	obj.active	 	= active;
+	obj.clear 		= clear;
+	obj.register	= register;
 
 	init();
 	return obj;
@@ -826,13 +879,16 @@ w2utils.keyboard = (function (obj) {
 		}
 	}
 
-	function register () {
-
-	}
-
 	function active (new_w2ui_name) {
 		if (typeof new_w2ui_name == 'undefined') return w2ui_name;
 		w2ui_name = new_w2ui_name;
+	}
+
+	function clear () {
+		w2ui_name = null;
+	}
+
+	function register () {
 	}
 
 })({});
@@ -969,18 +1025,10 @@ w2utils.keyboard = (function (obj) {
 	// w2overlay - appears under the element, there can be only one at a time
 
 	$.fn.w2overlay = function (html, options) {
-		var isOpened = false;
-		if (!$.isPlainObject(options)) options = {};
-		if (!$.isPlainObject(options.css)) options.css = {};
-
-		if (this.length == 0 || html == '' || typeof html == 'undefined') {
-			if (typeof options.onHide == 'function') options.onHide();
-			$('#w2ui-overlay').remove();
-			$(document).off('click', hide);
-			return $(this);
-		}
-		// insert (or re-insert) overlay
-		if ($('#w2ui-overlay').length > 0) { isOpened = true; $(document).off('click', hide); $('#w2ui-overlay').remove(); }
+		if (!$.isPlainObject(options)) 		options = {};
+		if (!$.isPlainObject(options.css)) 	options.css = {};
+		if (this.length == 0 || html == '' || typeof html == 'undefined') { hide(); return $(this);	}
+		if ($('#w2ui-overlay').length > 0) $(document).click();
 		$('body').append('<div id="w2ui-overlay" class="w2ui-reset w2ui-overlay"><div></div></div>');
 
 		// init
@@ -1019,12 +1067,26 @@ w2utils.keyboard = (function (obj) {
 		}
 
 		// need time to display
-		setTimeout(function () {
-			$(document).on('click', hide);
-			if (typeof options.onShow == 'function') options.onShow();
-		}, 1);
-
+		setTimeout(fixSize, 0);
 		return $(this);
+
+		function fixSize () {
+			$(document).on('click', hide);
+			// if goes over the screen, limit height and width
+			if ( $('#w2ui-overlay > div').length > 0) {
+				var h = $('#w2ui-overlay > div').height();
+				var w = $('#w2ui-overlay> div').width();
+				// $(window).height() - has a problem in FF20
+				var max = window.innerHeight - $('#w2ui-overlay > div').offset().top - 7;
+				if (h > max) $('#w2ui-overlay> div').height(max).width(w + w2utils.scrollBarSize()).css({ 'overflow-y': 'auto' });
+				// check width
+				w = $('#w2ui-overlay> div').width();
+				max = window.innerWidth - $('#w2ui-overlay > div').offset().left - 7;
+				if (w > max) $('#w2ui-overlay> div').width(max).css({ 'overflow-x': 'auto' });
+				// onShow event
+				if (typeof options.onShow == 'function') options.onShow();
+			}
+		}
 	}
 
 	$.fn.w2menu = function (menu, options) {

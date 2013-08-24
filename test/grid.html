@@ -1,7 +1,7 @@
 <html>
 <head>
-<link rel="stylesheet" type="text/css" media="screen" href="../css/w2ui.css" /> 
-<script type="text/javascript" src="../js/jquery.js"></script>
+<link rel="stylesheet" type="text/css" media="screen" href="../dist/w2ui.css" /> 
+<script type="text/javascript" src="../libs/jquery/jquery.min.js"></script>
 <script type="text/javascript" src="../src/w2utils.js"></script>
 <script type="text/javascript" src="../src/w2tabs.js"></script>
 <script type="text/javascript" src="../src/w2toolbar.js"></script>
@@ -21,8 +21,8 @@ $(function () {
 			header: true,
 			emptyRecords: true,
 			columnHeaders: true,
-			selectColumn: false,
-			expandColumn: true,
+			//selectColumn: true,
+			//expandColumn: true,
 			lineNumbers: true,
 			toolbarDelete: false,
 			toolbarSave: false,
@@ -31,6 +31,7 @@ $(function () {
 		postData: {
 			"admin": 'somename'
 		},
+		selectType: 'cell',
 		//autoLoad: false,
 		//offset: 99700,
 		//multiSelect: false,
@@ -63,14 +64,35 @@ $(function () {
 			{ caption: 'Important Dates', span: 3 }
 		],
 		columns: [				
-			{ field: 'personid', caption: 'ID', size: '100px', sortable: true, resizable: true, searchable: 'int' },
-			{ field: 'fname', caption: 'First Name', size: '200px', sortable: true, resizable: true, searchable: true },
-			{ field: 'lname', caption: 'Last Name', size: '200px', sortable: true, resizable: true, searchable: true },
-			{ field: 'email', caption: 'Email', size: '100%', resizable: true, sortable: true },
-			{ field: 'snumber', caption: 'Number', size: '120px', resizable: true, sortable: true, searchable: 'int', render: 'percent' },
-			{ field: 'sdate', caption: 'Date', size: '120px', resizable: true, sortable: true, searchable: 'date', render: 'date' }
+			{ field: 'personid', caption: 'ID', size: '80px', sortable: true, resizable: true, searchable: 'int', editable: { type: 'text' } },
+			{ field: 'fname', caption: 'First Name', size: '200px', sortable: true, resizable: true, 
+				searchable: true, editable: { type: 'text' } 
+			},
+			{ field: 'lname', caption: 'Last Name', size: '200px', sortable: true, resizable: true, searchable: true, editable: { type: 'text' } },
+			{ field: 'email', caption: 'Email', size: '100%', resizable: true, sortable: true, editable: { type: 'text' } },
+			{ field: 'snumber', caption: 'Number', size: '120px', resizable: true, sortable: true, searchable: 'int', render1: 'percent', editable: { type: 'text' } },
+			{ field: 'sdate', caption: 'Date', size: '120px', resizable: true, sortable: true, searchable: 'date', render1: 'date', editable: { type: 'text' } }
 		],
-		onExpand: function (target, data) {
+		ranges: [
+			{
+				name  : 'first',
+				range : [{"recid":15,"column":1},{"recid":29,"column":2}],
+			 	style : "border: 2px dotted green; background-color: rgba(100,400,100,0.2)"
+			},
+			{
+				name  : 'second',
+			 	range : [{"recid":6,"column":4},{"recid":9,"column":4}],
+			 	style : "border: 2px dotted orange; background-color: rgba(200,200,200,0.2)"
+			 }
+		],
+		onDelete: function (target, info) {
+			info.force = true;
+		},
+		onPaste: function (target, info) {
+			var grid = this;
+			info.onComplete = function () { grid.save(); }
+		},
+		onExpand1: function (target, data) {
 			if (w2ui['grid-'+ data.recid]) $().w2destroy('grid-'+ data.recid);
 			$('#'+ data.box_id).w2grid({ 
 				name: 'grid-' + data.recid,
@@ -106,8 +128,8 @@ $(function () {
 	//w2ui.grid.reload();
 	//return;
 
-	var fname = ['Vitali', '~Katsia', '!John', 'Peter', '#Sue', '$Olivia', '&lt;Thomas', '&gt;Sergei', 'Snehal', 'Avinash', 'Divia'];
-	var lname = ['Peterson', 'Rene', 'Johnson-Petrov-Sannikov-Ivanov-Smirnov', 'Cuban', 'Twist', 'Sidorov', 'Vasiliev', 'Yadav', 'Vaishnav'];
+	var fname = ['Vitali', 'Katsia', 'John', 'Peter', 'Sue', 'Olivia', 'Thomas', 'Sergei', 'Snehal', 'Avinash', 'Divia'];
+	var lname = ['Peterson', 'Rene', 'Johnson', 'Cuban', 'Twist', 'Sidorov', 'Vasiliev', 'Yadav', 'Vaishnav'];
 	// add 10k records
 	for (var i = 0; i < 2500; i++) {
 		w2ui['grid'].records.push({ 
@@ -121,8 +143,10 @@ $(function () {
 		});
 	}
 	w2ui.grid.total = w2ui.grid.records.length;
-	//w2ui.grid.records[90].summary = true;
+	w2ui.grid.records[90].summary = true;
 	//w2ui.grid.records[91].summary = true;
+	//w2ui.grid.records[96].summary = true;
+	w2ui.grid.records[80].summary = true;
 	w2ui.grid.refresh();
 	//w2ui['grid'].load('grid.json');
 });
@@ -131,9 +155,9 @@ $(function () {
 <body>
 	<div id="grid" style="width: 1024px; height: 568px;"></div>
 	<br>
-	<input type="button" value="destroy" onclick="$().w2destroy('grid');">
-	<input type="button" value="Jump 0" onclick="w2ui.grid.skip(0);">
-	<input type="button" value="Jump 10" onclick="w2ui.grid.skip(10);">
+	<input type="button" value="destroy"  onclick="$().w2destroy('grid');">
+	<input type="button" value="Jump 0"   onclick="w2ui.grid.skip(0);">
+	<input type="button" value="Jump 10"  onclick="w2ui.grid.skip(10);">
 	<input type="button" value="Jump 110" onclick="w2ui.grid.skip(110);">
 	<input type="button" value="Jump 300" onclick="w2ui.grid.skip(300);">
 	<input type="button" value="Jump 375" onclick="w2ui.grid.skip(375);">

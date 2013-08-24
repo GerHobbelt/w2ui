@@ -8,6 +8,7 @@
 * == NICE TO HAVE ==
 *	- onResize for the panel
 *	- problem with layout.html (see in 1.3)
+*	- add panel title
 *
 * == 1.3 changes ==
 *   - tabs can be array of string, array of tab objects or w2tabs object
@@ -20,6 +21,7 @@
 *	- moved some settings to prototype
 *	- added layout.lock(panel, msg, [showSpinner]), unlock(panel)
 *	- rename startResize -> resizeStart, stopResize -> resizeStop, doResize -> resizeMove
+*	- ability to load CSS into a hidden panel
 * 
 ************************************************************************/
 
@@ -42,7 +44,7 @@
 		this.onResize	= null;
 		this.onDestroy	= null
 		
-		$.extend(true, this, options, w2obj.layout);
+		$.extend(true, this, w2obj.layout, options);
 	};
 	
 	// ====================================================
@@ -119,6 +121,10 @@
 		content: function (panel, data, transition) {
 			var obj = this;
 			var p = this.get(panel);
+			if (panel == 'css') {
+				$('#layout_'+ obj.name +'_panel_css').html('<style>'+ data +'</style>');
+				return true;
+			}
 			if (p == null) return false;
 			if ($('#layout_'+ this.name + '_panel2_'+ p.type).length > 0) return false;
 			$('#layout_'+ this.name + '_panel_'+ p.type).scrollTop(0);
@@ -170,16 +176,25 @@
 			
 		load: function (panel, url, transition, onLoad) {
 			var obj = this;
-			if (this.get(panel) == null) return false;
-			$.get(url, function (data, status, object) {
-				obj.content(panel, object.responseText, transition);
-				if (onLoad) onLoad();
-				// IE Hack
-				if (window.navigator.userAgent.indexOf('MSIE')) setTimeout(function () { obj.resize(); }, 100);
-			});
-			return true;
+			if (panel == 'css') {
+				$.get(url, function (data, status, xhr) {					
+					obj.content(panel, xhr.responseText);
+					if (onLoad) onLoad();
+				});
+				return true;
+			}
+			if (this.get(panel) != null) {
+				$.get(url, function (data, status, xhr) {
+					obj.content(panel, xhr.responseText, transition);
+					if (onLoad) onLoad();
+					// IE Hack
+					if (window.navigator.userAgent.indexOf('MSIE')) setTimeout(function () { obj.resize(); }, 100);
+				});
+				return true;
+			}
+			return false;
 		},
-		
+
 		show: function (panel, immediate) {
 			var obj = this;
 			// event before
@@ -365,11 +380,11 @@
 			}
 			$(obj.box).find(' > div')
 				.append('<style id="layout_'+ obj.name + '_panel_css" style="position: absolute; top: 10000px;">'+ obj.css +'</style>');		
+			obj.refresh(); // if refresh is not called here, the layout will not be available right after initialization
 			// process event
 			obj.trigger($.extend(eventData, { phase: 'after' }));	
 			// reinit events
 			setTimeout(function () { // needed this timeout to allow browser to render first if there are tabs or toolbar
-				obj.refresh();
 				obj.resize();
 				obj.initEvents();
 			}, 0);
@@ -467,7 +482,7 @@
 							- (ptop && !ptop.hidden ? ptop.sizeCalculated : 0) 
 							- (pbottom && !pbottom.hidden ? pbottom.sizeCalculated : 0);
 					}
-					tmp.sizeCalculated = (tmp.type == 'left' || tmp.type == 'right' ? width : tmph) * parseInt(tmp.size) / 100;
+					tmp.sizeCalculated = parseInt((tmp.type == 'left' || tmp.type == 'right' ? width : tmph) * parseFloat(tmp.size) / 100);
 				} else {
 					tmp.sizeCalculated = parseInt(tmp.size);
 				}
@@ -721,9 +736,9 @@
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
 			
-			$(window).off('resize', this.events.resize);
-			$(document).off('mousemove', this.events.mousemove);
-			$(document).off('mouseup', this.events.mouseup);
+			if (this.events && this.events.resize) 		$(window).off('resize', this.events.resize);
+			if (this.events && this.events.mousemove) 	$(document).off('mousemove', this.events.mousemove);
+			if (this.events && this.events.mouseup) 	$(document).off('mouseup', this.events.mouseup);
 			
 			return true;
 		},
@@ -892,41 +907,45 @@
 			if (!window.addEventListener) { window.document.attachEvent('onselectstart', function() { return false; } ); }
 			if (typeof this.tmp_resizing == 'undefined') return;
 			// set new size
-			var ptop 	= this.get('top');
-			var pbottom	= this.get('bottom');
-			var panel 	= this.get(this.tmp_resizing);
-			var height 	= parseInt($(this.box).height());
-			var width 	= parseInt($(this.box).width());
-			var str 	= String(panel.size);
-			switch (this.tmp_resizing) {
-				case 'top':
-					var ns = parseInt(panel.sizeCalculated) + this.tmp_div_y;
-					var nd = 0;
-					break;
-				case 'bottom':
-					var nd = 0;
-				case 'preview':
-					var nd = (ptop && !ptop.hidden ? ptop.sizeCalculated : 0) 
-						   + (pbottom && !pbottom.hidden ? pbottom.sizeCalculated : 0);
-					var ns = parseInt(panel.sizeCalculated) - this.tmp_div_y;
-					break;
-				case 'left':
-					var ns = parseInt(panel.sizeCalculated) + this.tmp_div_x;
-					var nd = 0;
-					break;
-				case 'right': 
-					var ns = parseInt(panel.sizeCalculated) - this.tmp_div_x;
-					var nd = 0;
-					break;
-			}	
-			// set size
-			if (str.substr(str.length-1) == '%') {
-				panel.size = Math.floor(ns * 100 / 
-					(panel.type == 'left' || panel.type == 'right' ? width : height - nd) * 100) / 100 + '%';
-			} else {
-				panel.size = ns;
+			if (this.tmp_div_x != 0 || this.tmp_div_y != 0) { // only recalculate if changed
+				var ptop 	= this.get('top');
+				var pbottom	= this.get('bottom');
+				var panel 	= this.get(this.tmp_resizing);
+				var height 	= parseInt($(this.box).height());
+				var width 	= parseInt($(this.box).width());
+				var str 	= String(panel.size);
+				switch (this.tmp_resizing) {
+					case 'top':
+						var ns = parseInt(panel.sizeCalculated) + this.tmp_div_y;
+						var nd = 0;
+						break;
+					case 'bottom':
+						var ns = parseInt(panel.sizeCalculated) - this.tmp_div_y;
+						var nd = 0;
+						break;
+					case 'preview':
+						var ns = parseInt(panel.sizeCalculated) - this.tmp_div_y;
+						var nd = (ptop && !ptop.hidden ? ptop.sizeCalculated : 0) 
+							   + (pbottom && !pbottom.hidden ? pbottom.sizeCalculated : 0);
+						break;
+					case 'left':
+						var ns = parseInt(panel.sizeCalculated) + this.tmp_div_x;
+						var nd = 0;
+						break;
+					case 'right': 
+						var ns = parseInt(panel.sizeCalculated) - this.tmp_div_x;
+						var nd = 0;
+						break;
+				}	
+				// set size
+				if (str.substr(str.length-1) == '%') {
+					panel.size = Math.floor(ns * 100 / 
+						(panel.type == 'left' || panel.type == 'right' ? width : height - nd) * 100) / 100 + '%';
+				} else {
+					panel.size = ns;
+				}
+				this.resize();
 			}
-			this.resize();
 			$('#layout_'+ this.name + '_resizer_'+ this.tmp_resizing).removeClass('active');
 			delete this.tmp_resizing;
 		}		

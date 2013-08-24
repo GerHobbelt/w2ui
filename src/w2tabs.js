@@ -30,7 +30,7 @@
 		this.onResize	= null;
 		this.onDestroy	= null;
 
-		$.extend(true, this, options, w2obj.tabs);
+		$.extend(true, this, w2obj.tabs, options);
 	}
 	
 	// ====================================================
@@ -304,7 +304,7 @@
 			}
 			delete w2ui[this.name];
 			// event after
-			this.trigger($.extend({ phase: 'after' }));	
+			this.trigger($.extend(eventData, { phase: 'after' }));
 		},
 		
 		// ===================================================
