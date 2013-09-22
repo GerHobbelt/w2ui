@@ -1,3 +1,4 @@
+/* w2ui 1.3.x (c) http://w2ui.com, vitmalina@gmail.com */
 /*************************************************
 * --- Reset (used for all w2ui wdigetes)
 * --- The reset is needed to coexist with other CSS
@@ -302,6 +303,14 @@ select {
   filter: progid:dximagetransform.microsoft.gradient(startColorstr='#ff515d78', endColorstr='#ff323948', GradientType=0);
   border-top-left-radius: 3px;
   border-top-right-radius: 3px;
+}
+.w2ui-form .w2ui-form-toolbar {
+  position: absolute;
+  left: 0px;
+  right: 0px;
+  margin: 0px;
+  padding: 6px 3px;
+  border-bottom: 1px solid #3a4254;
 }
 .w2ui-form .w2ui-form-tabs {
   margin: 0px;
@@ -718,9 +727,9 @@ select {
 .w2ui-list ul li {
   float: left;
   margin: 2px 1px 0px 2px;
-  border-radius: 5px;
+  border-radius: 3px;
   width: auto;
-  padding: 1px 5px;
+  padding: 2px 5px;
   border: 1px solid #777f8c;
   background-color: #353d5b;
   white-space: nowrap;
@@ -1848,7 +1857,7 @@ select {
   float: left;
 }
 .w2ui-sidebar .w2ui-sidebar-div td.w2ui-node-data .w2ui-node-image > span {
-  font-size: 18px;
+  font-size: 16px;
   color: #c0c8d5;
   text-shadow: 0px 0px 0px #ffffff;
 }
