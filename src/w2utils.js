@@ -13,16 +13,19 @@ var w2obj = w2obj || {}; // expose object to be able to overwrite default functi
 *	- date has problems in FF new Date('yyyy-mm-dd') breaks
 *	- bug: w2utils.formatDate('2011-31-01', 'yyyy-dd-mm'); - wrong foratter
 *	- overlay should be displayed where more space (on top or on bottom)
-* 	- write and article how to replace certail framework functions
+* 	- write and article how to replace certain framework functions
+*	- format date and time is buggy
 *
 * == 1.3 changes ==
-*	- added locale(..., callBack), fixed bugs
+*	- fixed locale() bugs, made asynch
 *	- each widget has name in the box that is name of widget, $(name).w2grid('resize');
 *	- added $().w2marker('string')
 *	- added w2utils.keyboard module
 *	- added w2utils.formatNumber()
 *	- added w2menu() plugin
 *	- added formatTime(), formatDateTime()
+*	- refactor event flow: instead of (target, data) -> (event), but back compatibile
+*	- added lock() and unlock() for a div
 *
 ************************************************/
 
@@ -64,10 +67,12 @@ var w2utils = (function () {
 		base64encode	: base64encode,
 		base64decode	: base64decode,
 		transition		: transition,
+		lock			: lock,
+		unlock			: unlock,
 		lang 			: lang,
+		locale	 		: locale,
 		getSize			: getSize,
-		scrollBarSize	: scrollBarSize,
-		locale	 		: locale
+		scrollBarSize	: scrollBarSize
 	}
 	return obj;
 	
@@ -97,7 +102,7 @@ var w2utils = (function () {
 	}
 	
 	function isEmail (val) {
-		var email = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,4}$/;
+		var email = /^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
 		return email.test(val); 
 	}
 
@@ -685,6 +690,53 @@ var w2utils = (function () {
 		}
 	}
 	
+	function lock (box, msg, showSpinner) {
+		if (['absolute', 'fixed'].indexOf($(box).css('position')) != -1) {
+			console.log('ERROR: Only elements with absolute positioning can be locked.');
+			//return;
+		}
+		if (!msg && msg != 0) msg = '';
+		w2utils.unlock(box);
+		$(box).find('>:first-child').before(
+			'<div class="w2ui-lock"></div>'+
+			'<div class="w2ui-lock-msg"></div>'
+		);
+		setTimeout(function () {
+			var lock = $(box).find('.w2ui-lock');
+			var mess = $(box).find('.w2ui-lock-msg');
+			lock.data('old_opacity', lock.css('opacity')).css('opacity', '0').show();
+			mess.data('old_opacity', mess.css('opacity')).css('opacity', '0').show();
+			setTimeout(function () {
+				var lock = $(box).find('.w2ui-lock');
+				var mess = $(box).find('.w2ui-lock-msg');
+				var left = ($(box).width()  - w2utils.getSize(mess, 'width')) / 2;
+				var top  = ($(box).height() * 0.9 - w2utils.getSize(mess, 'height')) / 2;
+				lock.css({
+					opacity : lock.data('old_opacity'),
+					left 	: '0px',
+					top 	: '0px',
+					width 	: '100%',
+					height 	: '100%'
+				});
+				if (!msg) mess.css({ 'background-color': 'transparent', 'border': '0px' }); 
+				if (showSpinner === true) msg = '<div class="w2ui-spinner" '+ (!msg ? 'style="width: 30px; height: 30px"' : '') +'></div>' + msg;
+				mess.html(msg).css({
+					opacity : mess.data('old_opacity'),
+					left	: left + 'px',
+					top		: top + 'px'
+				});
+			}, 10);
+		}, 10);
+		// hide all overlay and tags
+		$().w2tag();
+		$().w2overlay();
+	}
+
+	function unlock (box) { 
+		$(box).find('.w2ui-lock').remove();
+		$(box).find('.w2ui-lock-msg').remove();
+	}
+
 	function getSize (el, type) {
 		var bwidth = {
 			left: 	parseInt($(el).css('border-left-width')) || 0,
@@ -722,23 +774,21 @@ var w2utils = (function () {
 		if (typeof translation == 'undefined') return phrase; else return translation;
 	}
 
-	function locale (locale, callBack) {
-		var settings = w2utils.settings;
-		if (typeof locale == 'string') locale = { lang: locale };
-		locale = $.extend({ path : 'locale', lang : 'en-us' }, locale);
+	function locale (locale) {
+		if (!locale) locale = 'en-us';
+		if (locale.length == 5) locale = 'locale/'+ locale +'.json';
 		// load from the file
 		$.ajax({
-			url		: locale.path + '/'+ locale.lang.toLowerCase() +'.json',
+			url		: locale,
 			type	: "GET",
 			dataType: "JSON",
 			async	: false,
 			cache 	: false,
 			success : function (data, status, xhr) {
 				w2utils.settings = $.extend(true, w2utils.settings, data);
-				if (typeof callBack == 'function') callBack(data);
 			},
 			error	: function (xhr, status, msg) {
-				console.log('ERROR: Cannot load locale '+ settings.lang +' in '+ settings.path);
+				console.log('ERROR: Cannot load locale '+ locale);
 			}
 		});
 	}
@@ -776,7 +826,7 @@ $.w2event = {
 	
 	off: function (eventData, handler) {
 		if (!$.isPlainObject(eventData)) eventData = { type: eventData };
-		eventData = $.extend({}, { type: null, execute: 'before', target: null, onComleted: null }, eventData);
+		eventData = $.extend({}, { type: null, execute: 'before', target: null, onComplete: null }, eventData);
 	
 		if (typeof eventData.type == 'undefined') { console.log('ERROR: You must specify event type when calling .off() method of '+ this.name); return; }
 		if (typeof handler == 'undefined') { handler = null;  }
@@ -796,39 +846,59 @@ $.w2event = {
 	},
 		
 	trigger: function (eventData) {
-		var eventData = $.extend({ type: null, phase: 'before', target: null, stop: false }, eventData,
-			{ preventDefault: function () { this.stop = true; } });
+		var eventData = $.extend({ type: null, phase: 'before', target: null, isStopped: false, isCancelled: false }, eventData, {
+				preventDefault 	: function () { this.isCancelled = true; },
+				stopPropagation : function () { this.isStopped   = true; },
+			});
 		if (typeof eventData.target == 'undefined') eventData.target = null;		
 		// process events in REVERSE order 
 		for (var h = this.handlers.length-1; h >= 0; h--) {
-			var t = this.handlers[h];
-			if ( (t.event.type == eventData.type || t.event.type == '*') 
-					&& (t.event.target == eventData.target || t.event.target == null)
-					&& (t.event.execute == eventData.phase || t.event.execute == '*' || t.event.phase == '*') ) {
-				var ret = t.handler.call(this, eventData.target, eventData);
-				if ($.isPlainObject(ret)) { 
-					$.extend(eventData, ret);
-					if (eventData.stop === true) return eventData; 
+			var item = this.handlers[h];
+			if ( (item.event.type == eventData.type || item.event.type == '*') 
+					&& (item.event.target == eventData.target || item.event.target == null)
+					&& (item.event.execute == eventData.phase || item.event.execute == '*' || item.event.phase == '*') ) {
+				eventData = $.extend({}, item.event, eventData);
+				// check handler arguments
+				var args = [];
+				var tmp  = RegExp(/\((.*?)\)/).exec(item.handler);
+				if (tmp) args = tmp[1].split(/\s*,\s*/);
+				if (args.length == 2) {
+					item.handler.call(this, eventData.target, eventData); // old way for back compatibility
+				} else {
+					item.handler.call(this, eventData); // new way
 				}
+				if (eventData.isStopped === true || eventData.stop === true) return eventData; // back compatibility eventData.stop === true
 			}
 		}		
 		// main object events
-		if (eventData.phase == 'before' 
-				&& typeof this['on' + eventData.type.substr(0,1).toUpperCase() + eventData.type.substr(1)] == 'function') {
-			var ret = this['on' + eventData.type.substr(0,1).toUpperCase() + eventData.type.substr(1)].call(this, eventData.target, eventData);
-			if ($.isPlainObject(ret)) { 
-				$.extend(eventData, ret);
-				if (eventData.stop === true) return eventData; 
+		var funName = 'on' + eventData.type.substr(0,1).toUpperCase() + eventData.type.substr(1);
+		if (eventData.phase == 'before' && typeof this[funName] == 'function') {
+			var fun = this[funName];
+			// check handler arguments
+			var args = [];
+			var tmp  = RegExp(/\((.*?)\)/).exec(fun);
+			if (tmp) args = tmp[1].split(/\s*,\s*/);
+			if (args.length == 2) {
+				fun.call(this, eventData.target, eventData); // old way for back compatibility
+			} else {
+				fun.call(this, eventData); // new way
 			}
+			if (eventData.isStopped === true || eventData.stop === true) return eventData; // back compatibility eventData.stop === true
 		}
 		// item object events
 		if (typeof eventData.object != 'undefined' && eventData.object != null && eventData.phase == 'before'
-				&& typeof eventData.object['on' + eventData.type.substr(0,1).toUpperCase() + eventData.type.substr(1)] == 'function') {
-			var ret = eventData.object['on' + eventData.type.substr(0,1).toUpperCase() + eventData.type.substr(1)].call(this, eventData.target, eventData);
-			if ($.isPlainObject(ret)) { 
-				$.extend(eventData, ret);
-				if (eventData.stop === true) return eventData; 
+				&& typeof eventData.object[funName] == 'function') {
+			var fun = eventData.object[funName];
+			// check handler arguments
+			var args = [];
+			var tmp  = RegExp(/\((.*?)\)/).exec(fun);
+			if (tmp) args = tmp[1].split(/\s*,\s*/);
+			if (args.length == 2) {
+				fun.call(this, eventData.target, eventData); // old way for back compatibility
+			} else {
+				fun.call(this, eventData); // new way
 			}
+			if (eventData.isStopped === true || eventData.stop === true) return eventData; 
 		}
 		// execute onComplete
 		if (eventData.phase == 'after' && eventData.onComplete != null)	eventData.onComplete.call(this, eventData);
@@ -864,6 +934,7 @@ w2utils.keyboard = (function (obj) {
 	function keydown (event) {
 		var tag = event.target.tagName;
 		if ($.inArray(tag, ['INPUT', 'SELECT', 'TEXTAREA']) != -1) return;
+		if ($(event.target).prop('contenteditable') == 'true') return;
 		if (!w2ui_name) return;
 		// pass to appropriate widget
 		if (w2ui[w2ui_name] && typeof w2ui[w2ui_name].keydown == 'function') {
@@ -925,6 +996,7 @@ w2utils.keyboard = (function (obj) {
 				el.innerHTML = el.innerHTML.replace(/\<span class=\"w2ui\-marker\"\>(.*)\<\/span\>/ig, '$1'); // unmark		
 				for (var s in str) {
 					var tmp = str[s];
+					if (typeof tmp != 'string') tmp = String(tmp);
 					// escape regex special chars
 					tmp = tmp.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&").replace(/&/g, '&amp;').replace(/</g, '&gt;').replace(/>/g, '&lt;');
 					var regex = new RegExp(tmp + '(?!([^<]+)?>)', "gi"); // only outside tags
@@ -944,7 +1016,7 @@ w2utils.keyboard = (function (obj) {
 		if (typeof options['class'] == 'undefined') options['class'] = '';
 		// remove all tags
 		if ($(this).length == 0) {
-			$('.global-tag').each(function (index, elem) {
+			$('.w2ui-tag').each(function (index, elem) {
 				var opt = $(elem).data('options');
 				if (typeof opt == 'undefined') opt = {};
 				$($(elem).data('taged-el')).removeClass( opt['class'] );
@@ -958,30 +1030,30 @@ w2utils.keyboard = (function (obj) {
 			var tagOrigID = el.id;
 			var tagID = w2utils.escapeId(el.id);
 			if (text == '' || text == null || typeof text == 'undefined') {
-				$('#global-tag-'+tagID).css('opacity', 0);
+				$('#w2ui-tag-'+tagID).css('opacity', 0);
 				setTimeout(function () {
 					// remmove element
-					clearInterval($('#global-tag-'+tagID).data('timer'));
-					$('#global-tag-'+tagID).remove();
+					clearInterval($('#w2ui-tag-'+tagID).data('timer'));
+					$('#w2ui-tag-'+tagID).remove();
 				}, 300);
 			} else {
 				// remove elements
-				clearInterval($('#global-tag-'+tagID).data('timer'));
-				$('#global-tag-'+tagID).remove();
+				clearInterval($('#w2ui-tag-'+tagID).data('timer'));
+				$('#w2ui-tag-'+tagID).remove();
 				// insert
-				$('body').append('<div id="global-tag-'+ tagOrigID +'" class="global-tag" '+
-								 '	style="position: absolute; z-index: 1701; opacity: 0; -webkit-transition: opacity .3s; -moz-transition: opacity .3s; -ms-transition: opacity .3s; -o-transition: opacity .3s"></div>');	
+				$('body').append('<div id="w2ui-tag-'+ tagOrigID +'" class="w2ui-tag '+ ($(el).parents('.w2ui-popup').length > 0 ? 'w2ui-tag-popup' : '') +'" '+
+								 '	style=""></div>');	
 
 				var timer = setInterval(function () { 
 					// monitor if destroyed
 					if ($(el).length == 0 || ($(el).offset().left == 0 && $(el).offset().top == 0)) {
-						clearInterval($('#global-tag-'+tagID).data('timer'));
+						clearInterval($('#w2ui-tag-'+tagID).data('timer'));
 						tmp_hide(); 
 						return;
 					}
 					// monitor if moved
-					if ($('#global-tag-'+tagID).data('position') != ($(el).offset().left + el.offsetWidth) + 'x' + $(el).offset().top) {
-						$('#global-tag-'+tagID).css({
+					if ($('#w2ui-tag-'+tagID).data('position') != ($(el).offset().left + el.offsetWidth) + 'x' + $(el).offset().top) {
+						$('#w2ui-tag-'+tagID).css({
 							'-webkit-transition': '.2s',
 							'-moz-transition': '.2s',
 							'-ms-transition': '.2s',
@@ -993,11 +1065,11 @@ w2utils.keyboard = (function (obj) {
 				}, 100);
 				setTimeout(function () {
 					if (!$(el).offset()) return;
-					$('#global-tag-'+tagID).css({
+					$('#w2ui-tag-'+tagID).css({
 						opacity: '1',
 						left: ($(el).offset().left + el.offsetWidth) + 'px',
 						top: $(el).offset().top + 'px'
-					}).html('<div style="margin-top: -2px 0px 0px -2px; white-space: nowrap;"> <div class="bubble-tag">'+ text +'</div> </div>')
+					}).html('<div style="margin-top: -2px 0px 0px -2px; white-space: nowrap;"> <div class="w2ui-tag-body">'+ text +'</div> </div>')
 					.data('text', text)
 					.data('taged-el', el)
 					.data('options', options)
@@ -1011,9 +1083,9 @@ w2utils.keyboard = (function (obj) {
 				if ($(el).length > 0) originalCSS = $(el)[0].style.cssText;
 				// bind event to hide it
 				function tmp_hide() { 
-					if ($('#global-tag-'+tagID).length <= 0) return;
-					clearInterval($('#global-tag-'+tagID).data('timer'));
-					$('#global-tag-'+tagID).remove(); 
+					if ($('#w2ui-tag-'+tagID).length <= 0) return;
+					clearInterval($('#w2ui-tag-'+tagID).data('timer'));
+					$('#w2ui-tag-'+tagID).remove(); 
 					$(el).off('keypress', tmp_hide).removeClass(options['class']); 
 					if ($(el).length > 0) $(el)[0].style.cssText = originalCSS;
 					if (typeof options.onHide == 'function') options.onHide();
@@ -1029,7 +1101,10 @@ w2utils.keyboard = (function (obj) {
 		if (!$.isPlainObject(options.css)) 	options.css = {};
 		if (this.length == 0 || html == '' || typeof html == 'undefined') { hide(); return $(this);	}
 		if ($('#w2ui-overlay').length > 0) $(document).click();
-		$('body').append('<div id="w2ui-overlay" class="w2ui-reset w2ui-overlay"><div></div></div>');
+		$('body').append('<div id="w2ui-overlay" class="w2ui-reset w2ui-overlay '+ 
+							($(this).parents('.w2ui-popup').length > 0 ? 'w2ui-overlay-popup' : '') +'">'+
+						'	<div></div>'+
+						'</div>');
 
 		// init
 		var obj = this;

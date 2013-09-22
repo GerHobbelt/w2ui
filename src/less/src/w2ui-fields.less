@@ -2,6 +2,107 @@
 // ---- Fields: Calendar, Enum ----
 //
 
+/* create an arrow that points up */
+.w2ui-field-helper {
+	position: absolute; 
+	display: inline-block; 
+	.user-select(none);
+
+	.w2ui-field-up {
+		position: absolute; 
+		top: 0px; 
+		padding: 2px 3px;
+	}
+	
+	.w2ui-field-down {
+		position: absolute; 
+		bottom: 0px; 
+		padding: 2px 3px;
+	}
+
+	.arrow-up:hover {
+		border-bottom-color: #81C6FF;
+	}
+
+	.arrow-down:hover {
+		border-top-color: #81C6FF;
+	}
+
+	.arrow-up {
+		width: 0; 
+		height: 0; 
+		border-left: 4px solid transparent;  /* left arrow slant */
+		border-right: 4px solid transparent; /* right arrow slant */
+		border-bottom: 5px solid #777; /* bottom, add background color here */
+		font-size: 0;
+		line-height: 0;
+	}
+
+	/* create an arrow that points down */
+	.arrow-down {
+		width: 0; 
+		height: 0; 
+		border-left: 4px solid transparent;
+		border-right: 4px solid transparent;
+		border-top: 5px solid #777;
+		font-size: 0;
+		line-height: 0;
+	}
+
+	/* create an arrow that points left */
+	.arrow-left {
+		width: 0; 
+		height: 0; 
+		border-bottom: 4px solid transparent;  /* left arrow slant */
+		border-top: 4px solid transparent; /* right arrow slant */
+		border-right: 5px solid #777; /* bottom, add background color here */
+		font-size: 0;
+		line-height: 0;
+	}
+
+	/* create an arrow that points right */
+	.arrow-right {
+		width: 0; 
+		height: 0; 
+		border-bottom: 4px solid transparent;  /* left arrow slant */
+		border-top: 4px solid transparent; /* right arrow slant */
+		border-left: 5px solid #777; /* bottom, add background color here */
+		font-size: 0;
+		line-height: 0;
+	}
+}
+
+.w2ui-color {
+	padding: 5px; 
+	background-color: white; 
+	border-radius: 3px;
+
+	> table {
+		table-layout: fixed;
+		width: 160px;
+
+		td {
+			width: 20px; 
+			height: 20px;
+
+			div {
+				cursor: pointer;
+				display: inline-block; 
+				width: 16px; 
+				height: 17px; 
+				padding: 1px 4px;
+				border: 1px solid transparent;
+				color: white;
+				text-shadow: 0px 0px 2px #000;
+				&:hover {
+					outline: 1px solid #666;
+					border: 1px solid #fff;
+				}
+			}
+		}
+	}
+}
+
 .w2ui-calendar {
 	position: absolute; 
 	z-index: 1600; 
@@ -230,6 +331,13 @@
             color: @dropdown-item-odd-color;
             background-color: @dropdown-item-odd-background-color;
         }
+
+        &.w2ui-item-group {
+			color: #444;
+			font-weight: bold;
+			background-color: #ECEDF0;
+			border-bottom: 1px solid #D3D2D4;
+		}
         
         &.selected {
             color: @dropdown-item-selected-color;
@@ -252,10 +360,10 @@
 
 	> span:first-child { // this a DROP ZONE message, will be remove when first file dropped
 		pointer-events: none;
-		display: inline-block;
-		padding-top: 5px;
-		font-size: 12px !important;
-		color: #aaa;
+		margin: 0px;
+		padding: 0px;
+		font-size: 14px !important;
+		color: #999;
 	}
 
 	&.dragover {
@@ -301,10 +409,10 @@
 			}
 
 			> div.file-delete {
-				float: left;
+				float: right;
 				z-index: 1;
 				width: 12px;
-				margin: 1px 3px 0px -2px;
+				margin: 1px -4px 0px 4px;
 				border-radius: 15px;
 				.background-image(@image-item-close, no-repeat, center, left);
 				background-position: 0px 0px;

@@ -216,7 +216,6 @@
 			// clear all enum fields
 			for (var f in this.fields) {
 				var field = this.fields[f];
-				if (field.options && field.options.selected) delete field.options.selected;
 			}
 			$().w2tag();
 			this.refresh();
@@ -226,7 +225,7 @@
 			var obj = this;
 			// let the management of the error outside of the grid
 			var eventData = this.trigger({ target: this.name, type: 'error', message: msg , xhr: this.last.xhr });
-			if (eventData.stop === true) {
+			if (eventData.isCancelled === true) {
 				if (typeof callBack == 'function') callBack();
 				return false;
 			}
@@ -304,7 +303,7 @@
 			}
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'validate', errors: errors });
-			if (eventData.stop === true) return errors;
+			if (eventData.isCancelled === true) return errors;
 			// show error
 			if (showErrors) for (var e in eventData.errors) {
 				var err = eventData.errors[e];
@@ -336,7 +335,7 @@
 			$.extend(params, postData);
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'request', target: this.name, url: this.url, postData: params });
-			if (eventData.stop === true) { if (typeof callBack == 'function') callBack({ status: 'error', message: 'Request aborted.' }); return false; }
+			if (eventData.isCancelled === true) { if (typeof callBack == 'function') callBack({ status: 'error', message: 'Request aborted.' }); return false; }
 			// default action
 			this.record	  = {};
 			this.original = {};
@@ -352,7 +351,7 @@
 					obj.unlock();
 					// event before
 					var eventData = obj.trigger({ phase: 'before', target: obj.name, type: 'load', xhr: xhr, status: status });	
-					if (eventData.stop === true) {
+					if (eventData.isCancelled === true) {
 						if (typeof callBack == 'function') callBack({ status: 'error', message: 'Request aborted.' });
 						return false;
 					}
@@ -450,7 +449,7 @@
 				}
 				// event before
 				var eventData = obj.trigger({ phase: 'before', type: 'submit', target: obj.name, url: obj.url, postData: params });
-				if (eventData.stop === true) { 
+				if (eventData.isCancelled === true) { 
 					if (typeof callBack == 'function') callBack({ status: 'error', message: 'Saving aborted.' }); 
 					return false; 
 				}
@@ -477,7 +476,7 @@
 
 						// event before
 						var eventData = obj.trigger({ phase: 'before', target: obj.name, type: 'save', xhr: xhr, status: status });	
-						if (eventData.stop === true) {
+						if (eventData.isCancelled === true) {
 							if (typeof callBack == 'function') callBack({ status: 'error', message: 'Saving aborted.' });
 							return false;
 						}
@@ -523,47 +522,13 @@
 		},
 
 		lock: function (msg, showSpinner) {
-			var obj = this;
-			if (typeof msg == 'undefined' || msg == '') {
-				setTimeout(function () {
-					$('#form_'+ obj.name +'_lock').remove();
-					$('#form_'+ obj.name +'_status').remove();
-				}, 25);
-			} else {
-				$('#form_'+ obj.name +'_lock').remove();
-				$('#form_'+ obj.name +'_status').remove();
-				$(this.box).find('> div :first-child').before(
-					'<div id="form_'+ obj.name +'_lock" class="w2ui-lock"></div>'+
-					'<div id="form_'+ obj.name +'_status" class="w2ui-lock-msg"></div>'
-				);
-				setTimeout(function () {
-					var lock 	= $('#form_'+ obj.name +'_lock');
-					var status 	= $('#form_'+ obj.name +'_status');
-					status.data('old_opacity', status.css('opacity')).css('opacity', '0').show();
-					lock.data('old_opacity', lock.css('opacity')).css('opacity', '0').show();
-					setTimeout(function () {
-						var left 	= ($(obj.box).width()  - w2utils.getSize(status, 'width')) / 2;
-						var top 	= ($(obj.box).height() * 0.9 - w2utils.getSize(status, 'height')) / 2;
-						lock.css({
-							opacity : lock.data('old_opacity'),
-							left 	: '0px',
-							top 	: '0px',
-							width 	: '100%',
-							height 	: '100%'
-						});
-						if (showSpinner === true) msg = '<div class="w2ui-spinner"></div>' + msg;
-						status.html(msg).css({
-							opacity : status.data('old_opacity'),
-							left	: left + 'px',
-							top		: top + 'px'
-						});
-					}, 10);
-				}, 10);
-			}
+			var box = $(this.box).find('> div:first-child');
+			w2utils.lock(box, msg, showSpinner);
 		},
 
-		unlock: function() {
-			this.lock();
+		unlock: function () { 
+			var obj = this;
+			setTimeout(function () { w2utils.unlock(obj.box); }, 25); // needed timer so if server fast, it will not flash
 		},
 
 		goto: function (page) {
@@ -607,8 +572,8 @@
 
 		action: function (action, event) {
 			// event before
-			var eventData = this.trigger({ phase: 'before', target: action, type: 'action', event: event });	
-			if (eventData.stop === true) return false;
+			var eventData = this.trigger({ phase: 'before', target: action, type: 'action', originalEvent: event });	
+			if (eventData.isCancelled === true) return false;
 			// default actions
 			if (typeof (this.actions[action]) == 'function') {
 				this.actions[action].call(this, event);
@@ -621,7 +586,7 @@
 			var obj = this;
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'resize' });
-			if (eventData.stop === true) return false;
+			if (eventData.isCancelled === true) return false;
 			// default behaviour
 			var main 	= $(this.box).find('> div');
 			var header	= $(this.box).find('> div .w2ui-form-header');
@@ -632,7 +597,7 @@
 			var buttons	= $(this.box).find('> div .w2ui-buttons');		
 			// if no height, calculate it
 			resizeElements();
-			if ($(this.box).height() == 0 || $(this.box).data('auto-size') === true) {
+			if (parseInt($(this.box).height()) == 0 || $(this.box).data('auto-size') === true) {
 				$(this.box).height(
 					(header.length > 0 ? w2utils.getSize(header, 'height') : 0) + 
 					(this.tabs.tabs.length > 0 ? w2utils.getSize(tabs, 'height') : 0) + 
@@ -675,7 +640,7 @@
 			});			
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'refresh', page: this.page })
-			if (eventData.stop === true) return false;
+			if (eventData.isCancelled === true) return false;
 			// default action
 			$(this.box).find('.w2ui-page').hide();
 			$(this.box).find('.w2ui-page.page-' + this.page).show();
@@ -703,16 +668,15 @@
 					var field 			= obj.get(this.name);
 					if ((field.type == 'enum' || field.type == 'upload') && $(this).data('selected')) {
 						var new_arr = $(this).data('selected');
-						var cur_arr = obj.get(this.name).selected;
+						var cur_arr =  obj.record[this.name];
 						var value_new = [];
 						var value_previous = [];
 						if ($.isArray(new_arr)) for (var i in new_arr) value_new[i] = $.extend(true, {}, new_arr[i]); // clone array
 						if ($.isArray(cur_arr)) for (var i in cur_arr) value_previous[i] = $.extend(true, {}, cur_arr[i]); // clone array
-						obj.get(this.name).selected = value_new;
 					}
 					// event before
 					var eventData = obj.trigger({ phase: 'before', target: this.name, type: 'change', value_new: value_new, value_previous: value_previous });
-					if (eventData.stop === true) { 
+					if (eventData.isCancelled === true) { 
 						$(this).val(obj.record[this.name]); // return previous value
 						return false;
 					}
@@ -799,8 +763,9 @@
 							console.log("ERROR: (w2form."+ obj.name +") the field "+ field.name +" defined as enum but not field.options.url or field.options.items provided.");
 							break;
 						}
-						var sel = value;
-						// if (field.selected) sel = field.selected;
+						// normalize value
+						this.record[field.name] = w2obj.field.cleanItems(value);
+						value = this.record[field.name];
 						$(field.el).w2field( $.extend({}, field.options, { type: 'enum', selected: value }) );
 						break;
 					case 'upload':
@@ -835,7 +800,7 @@
 			if (!this.isGenerated) return;
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'render', box: (typeof box != 'undefined' ? box : this.box) });	
-			if (eventData.stop === true) return false;
+			if (eventData.isCancelled === true) return false;
 			// default actions
 			var html =  '<div>' +
 						(this.header != '' ? '<div class="w2ui-form-header">' + this.header + '</div>' : '') +
@@ -877,7 +842,7 @@
 		destroy: function () { 
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'destroy' });	
-			if (eventData.stop === true) return false;
+			if (eventData.isCancelled === true) return false;
 			// clean up
 			if (typeof this.tabs == 'object' && this.tabs.destroy) this.tabs.destroy();
 			if ($(this.box).find('#form_'+ this.name +'_tabs').length > 0) {

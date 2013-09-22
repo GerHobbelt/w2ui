@@ -11,6 +11,7 @@
 * == 1.3 Changes ==
 * 	- doClick -> click, doMenuClick -> menuClick
 *	- deprecated getMenuHTML() due to its use in w2menu
+*	- added get() - w/o parametes return all
 * 
 ************************************************************************/
 
@@ -157,6 +158,11 @@
 		},
 		
 		get: function (id, returnIndex) {
+			if (arguments.length == 0) {
+				var all = [];
+				for (var i = 0; i < this.items.length; i++) if (this.items[i].id != null) all.push(this.items[i].id);
+				return all;
+			}
 			for (var i = 0; i < this.items.length; i++) {
 				if (this.items[i].id == id) { 
 					if (returnIndex === true) return i; else return this.items[i]; 
@@ -164,7 +170,7 @@
 			}
 			return null;
 		},
-			
+
 		show: function (id) {
 			var items = 0;
 			for (var a = 0; a < arguments.length; a++) {
@@ -240,7 +246,7 @@
 		render: function (box) {
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'render', target: this.name, box: box });	
-			if (eventData.stop === true) return false;
+			if (eventData.isCancelled === true) return false;
 	 
 			if (typeof box != 'undefined' && box != null) { 
 				if ($(this.box).find('> table #tb_'+ this.name + '_right').length > 0) {
@@ -282,7 +288,7 @@
 			if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection 
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'refresh', target: (typeof id != 'undefined' ? id : this.name), item: this.get(id) });	
-			if (eventData.stop === true) return false;
+			if (eventData.isCancelled === true) return false;
 			
 			if (typeof id == 'undefined') {
 				// refresh all
@@ -302,9 +308,13 @@
 			var html  = this.getItemHTML(it);
 			if (el.length == 0) {
 				// does not exist - create it
-				html =  '<td id="tb_'+ this.name + '_item_'+ it.id +'" style="'+ (it.hidden ? 'display: none' : '') +'" '+
+				if (it.type == 'spacer') {
+					html = '<td width="100%" id="tb_'+ this.name +'_item_'+ it.id +'" align="right"></td>';
+				} else {
+					html =  '<td id="tb_'+ this.name + '_item_'+ it.id +'" style="'+ (it.hidden ? 'display: none' : '') +'" '+
 						'	class="'+ (it.disabled ? 'disabled' : '') +'" valign="middle">'+ html + 
 						'</td>';
+				}
 				if (this.get(id, true) == this.items.length-1) {
 					$(this.box).find('#tb_'+ this.name +'_right').before(html);
 				} else {
@@ -324,7 +334,7 @@
 			if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection 
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'resize', target: this.name });	
-			if (eventData.stop === true) return false;
+			if (eventData.isCancelled === true) return false;
 
 			// empty function
 
@@ -335,7 +345,7 @@
 		destroy: function () { 
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'destroy', target: this.name });	
-			if (eventData.stop === true) return false;
+			if (eventData.isCancelled === true) return false;
 			// clean up
 			if ($(this.box).find('> table #tb_'+ this.name + '_right').length > 0) {
 				$(this.box)
@@ -413,8 +423,8 @@
 			if (it && !it.disabled) {
 				// event before
 				var eventData = this.trigger({ phase: 'before', type: 'click', target: (typeof id != 'undefined' ? id : this.name), item: this.get(id),
-					  subItem: (typeof menu_index != 'undefined' && this.get(id) ? this.get(id).items[menu_index] : null), event: event });	
-				if (eventData.stop === true) return false;
+					  subItem: (typeof menu_index != 'undefined' && this.get(id) ? this.get(id).items[menu_index] : null), originalEvent: event });	
+				if (eventData.isCancelled === true) return false;
 
 				// normal processing
 
@@ -430,8 +440,8 @@
 			if (it && !it.disabled) {
 				// event before
 				var eventData = this.trigger({ phase: 'before', type: 'click', target: (typeof id != 'undefined' ? id : this.name), 
-					item: this.get(id), event: event });	
-				if (eventData.stop === true) return false;
+					item: this.get(id), originalEvent: event });	
+				if (eventData.isCancelled === true) return false;
 			
 				$('#tb_'+ this.name +'_item_'+ w2utils.escapeId(it.id) +' table.w2ui-button').removeClass('down');
 								

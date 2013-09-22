@@ -6,15 +6,18 @@
 *   - Dependencies: jQuery, w2utils
 *
 * == NICE TO HAVE ==
-*  - select - for select, list - for drop down (needs this in grid)
-*  - enum (onLoaded)
-*  - enum (onCompare)
-*  - enum - onclick for already selected elements
-*  - enum needs events onItemClick, onItemOver, etc just like upload
-*  - upload (regular files)
+*	- select - for select, list - for drop down (needs this in grid)
+*	- enum add events: onLoaded, onCompare, onSelect, onDelete, onClick for already selected elements
+*	- enum needs events onItemClick, onItemOver, etc just like upload
+*	- upload (regular files)
+*	- enum - refresh happens on each key press even if not needed (for speed)
+*	- BUG with prefix/postfix and arrows (test in different contexts)
+*	- multiple date selection
 * 
 * == 1.3 changes ==
-*  - select type has options.url to pull from server
+*	- select type has options.url to pull from server
+*	- input number types with use of keyboard, prefix/suffic, arrow buttons
+*	- added render for enum, if returns === false, no item is show
 *
 ************************************************************************/
 
@@ -53,11 +56,17 @@
 					return;
 				}  
 				// Common Types
-				switch (options.type.toLowerCase()) {
+				var tp = options.type.toLowerCase();
+				switch (tp) {
 
 					case 'clear': // removes any previous field type
-						$(this).off('keypress').off('focus').off('blur');
-						$(this).removeData(); // removes all attached data
+						$(this)
+							.off('focus')
+							.off('blur')
+							.off('keypress')
+							.off('keydown')
+							.off('change')
+							.removeData(); // removes all attached data
 						if ($(this).prev().hasClass('w2ui-list')) {	// if enum
 							$(this).prev().remove();
 							$(this).removeAttr('tabindex').css('border-color', '').show();
@@ -66,90 +75,214 @@
 							$(this).prev().remove();
 							$(this).removeAttr('tabindex').css('border-color', '').show();
 						}
+						if ($(this).prev().hasClass('w2ui-field-helper')) {	// helpers
+							$(this).css('padding-left', $(this).css('padding-top'));
+							$(this).prev().remove();
+						}
+						if ($(this).next().hasClass('w2ui-field-helper')) {	// helpers
+							$(this).css('padding-right', $(this).css('padding-top'));
+							$(this).next().remove();
+						}
+						if ($(this).next().hasClass('w2ui-field-helper')) {	// helpers
+							$(this).next().remove();
+						}
 						break;
 
 					case 'text':
-						// intentionally left blank
-						break;
-
 					case 'int':
-						$(this).on('keypress', function (event) { // keyCode & charCode differ in FireFox
-							if (event.metaKey || event.ctrlKey || event.altKey || (event.charCode != event.keyCode && event.keyCode > 0)) return;
-							var ch = String.fromCharCode(event.charCode);
-							if (!w2utils.isInt(ch) && ch != '-') {
-								if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;
-								return false;
-							}
-						});
-						$(this).on('blur', function (event)  { // keyCode & charCode differ in FireFox
-							if (this.value != '' && !w2utils.isInt(this.value)) { 
-								$(this).w2tag(w2utils.lang('Not an integer'));
-							}
-						});
-						break;
-						
 					case 'float':
-						$(this).on('keypress', function (event) { // keyCode & charCode differ in FireFox
-							if (event.metaKey || event.ctrlKey || event.altKey || (event.charCode != event.keyCode && event.keyCode > 0)) return;
-							var ch = String.fromCharCode(event.charCode);
-							if (!w2utils.isInt(ch) && ch != '.' && ch != '-') {
-								if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;
-								return false;
-							}
-						});
-						$(this).on('blur', function (event)  { 
-							if (this.value != '' && !w2utils.isFloat(this.value)) {
-								$(this).w2tag(w2utils.lang('Not a float'));
-							} 
-						});
-						break;
-						
 					case 'money':
-						$(this).on('keypress', function (event) { // keyCode & charCode differ in FireFox	
-							if (event.metaKey || event.ctrlKey || event.altKey || (event.charCode != event.keyCode && event.keyCode > 0)) return;
-							var ch = String.fromCharCode(event.charCode);
-							if (!w2utils.isInt(ch) && ch != '.' && ch != '-' && ch != '$' && ch != '€' && ch != '£' && ch != '¥') {
-								if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;
-								return false;
-							}
-						});
-						$(this).on('blur', function (event)  { 
-							if (this.value != '' && !w2utils.isMoney(this.value)) { 
-								$(this).w2tag(w2utils.lang('Not in money format'));
-							} 
-						});
-						break;
-						
-					case 'hex':
-						$(this).on('keypress', function (event) { // keyCode & charCode differ in FireFox	
-							if (event.metaKey || event.ctrlKey || event.altKey || (event.charCode != event.keyCode && event.keyCode > 0)) return;
-							var ch = String.fromCharCode(event.charCode);
-							if (!w2utils.isHex(ch)) {
-								if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;
-								return false;
-							}
-						});
-						$(this).on('blur', function (event)  { 
-							if (this.value != '' && !w2utils.isHex(this.value)) { 
-								$(this).w2tag(w2utils.lang('Not a hex number'));
-							}
-						});
-						break;
-						 
 					case 'alphanumeric':
-						$(this).on('keypress', function (event) { // keyCode & charCode differ in FireFox
-							if (event.metaKey || event.ctrlKey || event.altKey || (event.charCode != event.keyCode && event.keyCode > 0)) return;
-							var ch = String.fromCharCode(event.charCode);
-							if (!w2utils.isAlphaNumeric(ch)) {
-								if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;
-								return false;
+					case 'hex':
+						var el = this;
+						var defaults = {
+							min 	: null,
+							max 	: null,
+							arrows	: false,
+							keyboard: true,
+							suffix	: '',
+							prefix  : ''
+						}
+						options = $.extend({}, defaults, options);
+						if (['text', 'alphanumeric', 'hex'].indexOf(tp) != -1) {
+							options.arrows   = false;
+							options.keyboard = false;
+						}
+						// init events
+						$(this)
+							.data('options', options)
+							.on('keypress', function (event) { // keyCode & charCode differ in FireFox
+								if (event.metaKey || event.ctrlKey || event.altKey || (event.charCode != event.keyCode && event.keyCode > 0)) return;
+								if (event.keyCode == 13) $(this).change();
+								var ch = String.fromCharCode(event.charCode);
+								if (!checkType(ch, true)) {
+									if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;
+									return false;
+								}
+							})
+							.on('keydown', function (event, extra) {
+								if (!options.keyboard) return;
+								var cancel = false;
+								var v = $(el).val();
+								if (!checkType(v)) v = options.min || 0; else v = parseFloat(v);
+								var key = event.keyCode || extra.keyCode;
+								var inc = 1;
+								if (event.ctrlKey || event.metaKey) inc = 10;
+								switch (key) {
+									case 38: // up
+										$(el).val((v + inc <= options.max || options.max == null ? v + inc : options.max)).change();
+										if (tp == 'money') $(el).val( Number($(el).val()).toFixed(2) );
+										cancel = true;
+										break;
+									case 40: // down
+										$(el).val((v - inc >= options.min || options.min == null ? v - inc : options.min)).change();
+										if (tp == 'money') $(el).val( Number($(el).val()).toFixed(2) );
+										cancel = true;
+										break;
+								}							
+								if (cancel) {
+									event.preventDefault();
+									// set cursor to the end
+									setTimeout(function () { el.setSelectionRange(el.value.length, el.value.length); }, 0);
+								}
+							})
+							.on('change', function (event) {
+								// check max/min
+								var v  = $(el).val();
+								var cancel = false;
+								if (options.min != null && v != '' && v < options.min) { $(el).val(options.min).change(); cancel = true; }
+								if (options.max != null && v != '' && v > options.max) { $(el).val(options.max).change(); cancel = true; }
+								if (cancel) {
+									event.stopPropagation();
+									event.preventDefault();
+									return false;
+								}
+								// check validity
+								if (this.value != '' && !checkType(this.value)) $(this).val(options.min != null ? options.min : '');								
+							});
+						if ($(this).val() == '' && options.min != null) $(this).val(options.min);
+						if (options.prefix != '') {
+							$(this).before(
+								'<div class="w2ui-field-helper">'+ 
+									options.prefix + 
+								'</div>');
+							var helper = $(this).prev();
+							helper
+								.css({
+									'color'			: $(this).css('color'),
+									'font-family'	: $(this).css('font-family'),
+									'font-size'		: $(this).css('font-size'),
+									'padding-top'	: $(this).css('padding-top'),
+									'padding-bottom': $(this).css('padding-bottom'),
+									'padding-left'  : $(this).css('padding-left'),
+									'padding-right'	: 0,
+									'margin-top'	: (parseInt($(this).css('margin-top')) + 1) + 'px',
+									'margin-bottom'	: (parseInt($(this).css('margin-bottom')) + 1) + 'px',
+									'margin-left'	: 0,
+									'margin-right' 	: 0
+								})
+								.on('click', function () { 
+									$(this).next().focus(); 
+								});
+							$(this).css('padding-left', (helper.width() + parseInt($(this).css('padding-left')) + 5) + 'px');
+						}						
+						var pr = parseInt($(this).css('padding-right'));
+						if (options.arrows != '') {
+							$(this).after(
+								'<div class="w2ui-field-helper" style="border: 1px solid transparent">&nbsp;'+ 
+								'	<div class="w2ui-field-up" type="up">'+
+								'		<div class="arrow-up" type="up"></div>'+
+								'	</div>'+
+								'	<div class="w2ui-field-down" type="down">'+
+								'		<div class="arrow-down" type="down"></div>'+
+								'	</div>'+
+								'	<div style="position: absolute; height: 1px; border-top: 1px solid red"></div>'+
+								'</div>');
+							var height = w2utils.getSize(this, 'height');
+							var helper = $(this).next();
+							helper
+								.css({
+									'color'			: $(this).css('color'),
+									'font-family'	: $(this).css('font-family'),
+									'font-size'		: $(this).css('font-size'),
+									'height' 		: ($(this).height() + parseInt($(this).css('padding-top')) + parseInt($(this).css('padding-bottom')) ) + 'px',
+									'padding'		: '0px',
+									'margin-top'	: (parseInt($(this).css('margin-top')) + 1) + 'px',
+									'margin-bottom'	: '0px',
+									'border-left'	: '1px solid silver'
+								})
+								.css('margin-left', '-'+ (helper.width() + parseInt($(this).css('margin-right')) + 12) + 'px')
+								.on('mousedown', function (event) {
+									var btn = this;
+									var evt = event;
+									$('body').on('mouseup', tmp);
+									$('body').data('_field_update_timer', setTimeout(update, 700));
+									update(false);
+									// timer function
+									function tmp() {
+										clearTimeout($('body').data('_field_update_timer'));
+										$('body').off('mouseup', tmp);
+									}
+									// update function
+									function update(notimer) {
+										$(el).focus().trigger($.Event("keydown"), { 
+											keyCode : ($(evt.target).attr('type') == 'up' ? 38 : 40) 
+										});
+										if (notimer !== false) $('body').data('_field_update_timer', setTimeout(update, 60));
+									};
+								});
+							pr += helper.width() + 12;
+							$(this).css('padding-right', pr + 'px');
+						}
+						if (options.suffix != '') {
+							$(this).after(
+								'<div class="w2ui-field-helper">'+ 
+									options.suffix + 
+								'</div>');
+							var helper = $(this).next();
+							helper
+								.css({
+									'color'			: $(this).css('color'),
+									'font-family'	: $(this).css('font-family'),
+									'font-size'		: $(this).css('font-size'),
+									'padding-top'	: $(this).css('padding-top'),
+									'padding-bottom': $(this).css('padding-bottom'),
+									'padding-left'	: '3px',
+									'padding-right'	: $(this).css('padding-right'),
+									'margin-top'	: (parseInt($(this).css('margin-top')) + 1) + 'px',
+									'margin-bottom'	: (parseInt($(this).css('margin-bottom')) + 1) + 'px'
+								})
+								.on('click', function () { 
+									$(this).prev().focus(); 
+								});
+							helper.css('margin-left', '-'+ (helper.width() + parseInt($(this).css('padding-right')) + 5) + 'px');
+							pr += helper.width() + 3;
+							$(this).css('padding-right', pr + 'px');
+						}
+
+						function checkType(ch, loose) {
+							switch (tp) {
+								case 'int':
+									if (loose && ['-'].indexOf(ch) != -1) return true;
+									return w2utils.isInt(ch); 
+									break;
+								case 'float':
+									if (loose && ['-','.'].indexOf(ch) != -1) return true;
+									return w2utils.isFloat(ch); 
+									break;
+								case 'money':
+									if (loose && ['-','.','$','€','£','¥'].indexOf(ch) != -1) return true;
+									return w2utils.isMoney(ch); 
+									break;
+								case 'hex':
+									return w2utils.isHex(ch); 
+									break;
+								case 'alphanumeric': 
+									return w2utils.isAlphaNumeric(ch); 
+									break;
 							}
-						});
-						$(this).on('blur', function (event)  { 
-							if (this.value != '' && !w2utils.isAlphaNumeric(this.value)) { 
-								$(this).w2tag(w2utils.lang('Not alpha-numeric')) 
-							} 
-						});
+							return true;
+						}
 						break;
 						
 					case 'date':
@@ -185,13 +318,20 @@
 									})
 									.data('el', obj)
 									.show();
+								var max = $(window).width() + $(document).scrollLeft() - 1;
+								if (left + $('#global_calendar_div').width() > max) {
+									$('#global_calendar_div').css('left', (max - $('#global_calendar_div').width()) + 'px');
+								}
 								// monitors
 								var mtimer = setInterval(function () { 
+									var max = $(window).width() + $(document).scrollLeft() - 1;
+									var left = $(obj).offset().left;
+									if (left + $('#global_calendar_div').width() > max) left = max - $('#global_calendar_div').width();
 									// monitor if moved
 									if ($('#global_calendar_div').data('position') != ($(obj).offset().left) + 'x' + ($(obj).offset().top  + obj.offsetHeight)) {
 										$('#global_calendar_div').css({
 											'-webkit-transition': '.2s',
-											left: ($(obj).offset().left) + 'px',
+											left: left + 'px',
 											top : ($(obj).offset().top + obj.offsetHeight) + 'px'
 										}).data('position', ($(obj).offset().left) + 'x' + ($(obj).offset().top + obj.offsetHeight));
 									}
@@ -233,6 +373,150 @@
 						break;
 						
 					case 'color':
+						var obj = this;
+						var defaults = {
+							prefix 	: '#',
+							suffix  : '<div style="margin-top: 1px; height: 12px; width: 12px;"></div>'
+						}
+						options = $.extend({}, defaults, options);
+						// -- insert div for color
+						$(this)
+							.attr('maxlength', 6)
+							.on('focus', function () {
+								var top  = parseFloat($(obj).offset().top) + parseFloat(obj.offsetHeight);
+								var left = parseFloat($(obj).offset().left);
+								clearInterval($(obj).data('mtimer'));
+								$('#global_color_div').remove();
+								$('body').append('<div id="global_color_div" style="top: '+ (top + parseInt(obj.offsetHeight)) +'px; left: '+ left +'px;" '+
+									' class="w2ui-reset w2ui-calendar" '+
+									' onmousedown="'+
+									'		if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true; '+
+									'		if (event.preventDefault) event.preventDefault(); else return false;">'+
+									'</div>');
+								$('#global_color_div')
+									.html($().w2field('getColorHTML', obj.value))
+									.css({
+										left: left + 'px',
+										top: top + 'px'
+									})
+									.data('el', obj)
+									.show();
+								var max = $(window).width() + $(document).scrollLeft() - 1;
+								if (left + $('#global_color_div').width() > max) {
+									$('#global_color_div').css('left', (max - $('#global_color_div').width()) + 'px');
+								}
+								// monitors
+								var mtimer = setInterval(function () { 
+									var max  = $(window).width() + $(document).scrollLeft() - 1;
+									var left = $(obj).offset().left;
+									if (left + $('#global_color_div').width() > max) left = max - $('#global_color_div').width();
+									// monitor if moved
+									if ($('#global_color_div').data('position') != ($(obj).offset().left) + 'x' + ($(obj).offset().top  + obj.offsetHeight)) {
+										$('#global_color_div').css({
+											'-webkit-transition': '.2s',
+											left: left + 'px',
+											top : ($(obj).offset().top + obj.offsetHeight) + 'px'
+										}).data('position', ($(obj).offset().left) + 'x' + ($(obj).offset().top + obj.offsetHeight));
+									}
+									// monitor if destroyed
+									if ($(obj).length == 0 || ($(obj).offset().left == 0 && $(obj).offset().top == 0)) {
+										clearInterval(mtimer);
+										$('#global_color_div').remove();
+										return;
+									}
+								}, 100);
+								$(obj).data('mtimer', mtimer);
+							})
+							.on('click', function () {
+								$(this).trigger('focus');
+							})
+							.on('blur', function (event) {
+								// trim empty spaces
+								$(obj).val($.trim($(obj).val()));
+								clearInterval($(obj).data('mtimer'));
+								$('#global_color_div').remove();
+							})
+							.on('keydown', function (event) { // need this for cut/paster
+								if (event.keyCode == 86 && (event.ctrlKey || event.metaKey)) {
+									var obj = this;
+									$(this).prop('maxlength', 7);
+									setTimeout(function () {
+										var val = $(obj).val();
+										if (val.substr(0, 1) == '#') val = val.substr(1);
+										if (!w2utils.isHex(val)) val = '';
+										$(obj).val(val).prop('maxlength', 6).change();
+									}, 20);
+								}
+							})
+							.on('keyup', function (event) {
+								if (event.keyCode == 86 && (event.ctrlKey || event.metaKey)) $(this).prop('maxlength', 6);
+							})
+							.on('keypress', function (event) { // keyCode & charCode differ in FireFox
+								if (event.keyCode == 13) $(this).change();
+								//if (event.ct)
+								var ch = String.fromCharCode(event.charCode);
+								if (!w2utils.isHex(ch, true)) {
+									if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;
+									return false;
+								}
+							})
+							.on('change', function (event) {
+								var color = '#' + $(this).val();
+								if ($(this).val().length != 6 && $(this).val().length != 3) color = '';
+								$(this).next().find('div').css('background-color', color);
+							});
+						if (options.prefix != '') {
+							$(this).before(
+								'<div class="w2ui-field-helper">'+ 
+									options.prefix + 
+								'</div>');
+							var helper = $(this).prev();
+							helper
+								.css({
+									'color'			: $(this).css('color'),
+									'font-family'	: $(this).css('font-family'),
+									'font-size'		: $(this).css('font-size'),
+									'padding-top'	: $(this).css('padding-top'),
+									'padding-bottom': $(this).css('padding-bottom'),
+									'padding-left'  : $(this).css('padding-left'),
+									'padding-right'	: 0,
+									'margin-top'	: (parseInt($(this).css('margin-top')) + 1) + 'px',
+									'margin-bottom'	: (parseInt($(this).css('margin-bottom')) + 1) + 'px',
+									'margin-left'	: 0,
+									'margin-right' 	: 0
+								})
+								.on('click', function () { 
+									$(this).next().focus(); 
+								});
+							$(this).css('padding-left', (helper.width() + parseInt($(this).css('padding-left')) + 2) + 'px');
+						}
+						if (options.suffix != '') {
+							$(this).after(
+								'<div class="w2ui-field-helper">'+ 
+									options.suffix + 
+								'</div>');
+							var helper = $(this).next();
+							helper
+								.css({
+									'color'			: $(this).css('color'),
+									'font-family'	: $(this).css('font-family'),
+									'font-size'		: $(this).css('font-size'),
+									'padding-top'	: $(this).css('padding-top'),
+									'padding-bottom': $(this).css('padding-bottom'),
+									'padding-left'	: '3px',
+									'padding-right'	: $(this).css('padding-right'),
+									'margin-top'	: (parseInt($(this).css('margin-top')) + 1) + 'px',
+									'margin-bottom'	: (parseInt($(this).css('margin-bottom')) + 1) + 'px'
+								})
+								.on('click', function () { 
+									$(this).prev().focus(); 
+								});
+							helper.css('margin-left', '-'+ (helper.width() + parseInt($(this).css('padding-right')) + 4) + 'px');
+							var pr = helper.width() + parseInt($(this).css('padding-right')) + 4;
+							$(this).css('padding-right', pr + 'px');
+							// set color to current
+							helper.find('div').css('background-color', '#' + $(obj).val());
+						}
 						break;
 
 					case 'select':
@@ -294,13 +578,15 @@
 						var defaults = {
 							url			: '',
 							items		: [],
-							selected 	: [],		// preselected items
-							max 		: 0,		// maximum number of items that can be selected 0 for unlim
-							maxHeight 	: 72, 		// max height for input control to grow
-							showAll		: false,	// if true then show selected item in drop down
-							maxCache 	: 500,		// number items to cache
-							onRender 	: null,		// -- not implemented
-							onSelect 	: null		// -- not implemented (you can use onChange for the input)
+							selected 	: [],				// preselected items
+							max 		: 0,				// maximum number of items that can be selected 0 for unlim
+							maxHeight 	: 72, 				// max height for input control to grow
+							showAll		: false,			// if true then show selected item in drop down
+							match 		: 'begins with', 	// ['begins with', 'contains']
+							render 		: null,				// render function
+							maxCache 	: 500,				// number items to cache
+							onRender 	: null,				// -- not implemented
+							onSelect 	: null				// -- not implemented (you can use onChange for the input)
 						}
 						var obj	= this;
 						var settings = $.extend({}, defaults, options);
@@ -484,6 +770,7 @@
 							var settings = $(this).data('settings');
 							var selected = $(this).data('selected');
 							$(div).find('li').remove();
+							$(div).find('> span:first-child').css('line-height', ($(div).height() - w2utils.getSize(div, '+height')) + 'px');
 							for (var s in selected) {
 								var file = selected[s];
 								// add li element
@@ -601,7 +888,7 @@
 				}
 				if (w2utils.isInt(id)) id = parseInt(id);
 				if (w2utils.isFloat(id)) id = parseFloat(id);
-				newItems.push({ id: id, text: text });
+				newItems.push($.extend({}, opt, { id: id, text: text }));
 			}
 			return newItems;
 		},
@@ -668,7 +955,7 @@
 						var selected = $(obj).data('selected');
 						var cnt  = 0;
 						for (var s in selected) { cnt++; }
-						if (cnt<settings.max) $(div).find('.file-input').click();
+						if (cnt < settings.max || settings.max == 0) $(div).find('.file-input').click();
 					}
 				})
 				.off('dragenter')
@@ -779,6 +1066,7 @@
 				if (selected.length == 0) {
 					$(div).prepend('<span>'+ settings.hint +'</span>');
 				}
+				obj.refresh();
 				$(obj).trigger('change');
 			}, 300);
 		},
@@ -845,24 +1133,35 @@
 			var ids	  = [];
 			for (var a in selected) ids.push(w2utils.isInt(selected[a].id) ? parseInt(selected[a].id) : String(selected[a].id))
 			// build list
+			var group = '';
 			for (var a in items) {
 				var id  = items[a].id;
 				var txt = items[a].text;
 				// if already selected
 				if ($.inArray(w2utils.isInt(id) ? parseInt(id) : String(id), ids) != -1 && settings.showAll !== true) continue;
 				// check match with search
-				var txt1 = String(search).toLowerCase();
-				var txt2 = txt.toLowerCase();
-				if (txt1.length <= txt2.length && txt2.substr(0, txt1.length) == txt1) {
+				var txt1  = String(search).toLowerCase();
+				var txt2  = txt.toLowerCase();
+				var match = (txt1.length <= txt2.length && txt2.substr(0, txt1.length) == txt1);
+				if (settings.match.toLowerCase() == 'contains' && txt2.indexOf(txt1) != -1) match = true;
+				if (match) {
 					if (typeof settings['render'] == 'function') {
-						txt = settings['render'](items[a]);
+						txt = settings['render'](items[a], selected);
 					}
-					ihtml += '\n<li index="'+ a +'" value="'+ id +'" '+
-							 '  onmouseover="$(this).parent().find(\'li\').removeClass(\'selected\'); $(this).addClass(\'selected\'); "'+
-							 '	class="'+ (i % 2 ? 'w2ui-item-even' : 'w2ui-item-odd') + (i == $(obj).data('last_index') ? " selected" : "") +'">'+ 
-							 txt +'</li>';
-					if (i == $(obj).data('last_index')) $(obj).data('last_item', items[a]);
-					i++;
+					if (txt !== false) {
+						// render group if needed
+						if (typeof items[a].group != 'undefined' && items[a].group != group) {
+							group = items[a].group;
+							ihtml += '<li class="w2ui-item-group" onmousedown="event.preventDefault()">'+ group +'</li>';
+						}
+						// render item
+						ihtml += '\n<li index="'+ a +'" value="'+ id +'" '+
+								 '  onmouseover="$(this).parent().find(\'li\').removeClass(\'selected\'); $(this).addClass(\'selected\'); "'+
+								 '	class="'+ (i % 2 ? 'w2ui-item-even' : 'w2ui-item-odd') + (i == $(obj).data('last_index') ? " selected" : "") +'">'+ 
+								 txt +'</li>';
+						if (i == $(obj).data('last_index')) $(obj).data('last_item', items[a]);
+						i++;
+					}
 				}
 			}
 			ihtml += '</ul>';
@@ -894,8 +1193,10 @@
 			$(div)
 				.off('mousedown')
 				.on('mousedown', function (event) {
-					if (event.target && event.target.tagName != 'LI') return;
-					var id 	 = $(event.target).attr('index');
+					var target = event.target;
+					if (target.tagName != "LI") target = $(target).parents('li');
+					var id 	 = $(target).attr('index');
+					if (!id) return;
 					var item = settings.items[id];
 					if (typeof id == 'undefined') { if (event.preventDefault) event.preventDefault(); else return false; }
 					obj.add(item);
@@ -1151,6 +1452,38 @@
 				day++;
 			}
 			html += '</tr></table>';
+			return html;
+		},
+
+		getColorHTML: function (color) {
+			var html =  '<div class="w2ui-color">'+ 
+						'<table cellspacing="5">';
+			var colors	= [
+				['000000', '444444', '666666', '999999', 'CCCCCC', 'EEEEEE', 'F3F3F3', 'FFFFFF'],
+				['FF011B', 'FF9838', 'FFFD59', '01FD55', '00FFFE', '0424F3', '9B24F4', 'FF21F5'],
+				['F4CCCC', 'FCE5CD', 'FFF2CC', 'D9EAD3', 'D0E0E3', 'CFE2F3', 'D9D1E9', 'EAD1DC'],
+				['EA9899', 'F9CB9C', 'FEE599', 'B6D7A8', 'A2C4C9', '9FC5E8', 'B4A7D6', 'D5A6BD'],
+				['E06666', 'F6B26B', 'FED966', '93C47D', '76A5AF', '6FA8DC', '8E7CC3', 'C27BA0'],
+				['CC0814', 'E69138', 'F1C232', '6AA84F', '45818E', '3D85C6', '674EA7', 'A54D79'],
+				['99050C', 'B45F17', 'BF901F', '37761D', '124F5C', '0A5394', '351C75', '741B47'],
+				['660205', '783F0B', '7F6011', '274E12', '0C343D', '063762', '20124D', '4C1030']
+			];
+			for (var i=0; i<8; i++) {
+				html += '<tr>';
+				for (var j=0; j<8; j++) {
+					html += '<td>'+
+							'	<div onclick="var el = $(\'#global_color_div\').data(\'el\');'+
+							'			$(el).val($(this).attr(\'name\')).change(); '+
+							'			$(\'#global_color_div\').hide()" '+
+							'		style="background-color: #'+ colors[i][j] +';" name="'+ colors[i][j] +'">'+
+							'		'+ (color == colors[i][j] ? '&#149;' : '&nbsp;')+
+							'	</div>'+
+							'</td>';
+				}
+				html += '</tr>';
+				if (i < 2) html += '<tr><td style="height: 8px" colspan="8"></td></tr>';
+			}
+			html += '</table></div>';
 			return html;
 		}
 	});

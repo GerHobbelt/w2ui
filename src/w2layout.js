@@ -118,6 +118,11 @@
 			onHide 		: null
 		},
 
+		// alias for content
+		html: function (panel, data, transition) {
+			return this.content(panel, data, transition);
+		},
+			
 		content: function (panel, data, transition) {
 			var obj = this;
 			var p = this.get(panel);
@@ -135,6 +140,10 @@
 					console.log('ERROR: You can not pass jQuery object to w2layout.content() method');
 					return false;
 				}
+				// remove foreign classes and styles
+				var tmp = $('#'+ 'layout_'+ this.name + '_panel_'+ panel + ' > .w2ui-panel-content');
+				tmp.attr('class', 'w2ui-panel-content');
+				if (tmp.length > 0 && typeof p.style != 'undefined') tmp[0].style.cssText = p.style;
 				if (p.content == '') {
 					p.content = data;
 					if (!p.hidden) this.refresh(panel);
@@ -170,10 +179,6 @@
 			return true;
 		},
 		
-		html: function (panel, data, transition) {
-			this.content(panel, data, transition);
-		},
-			
 		load: function (panel, url, transition, onLoad) {
 			var obj = this;
 			if (panel == 'css') {
@@ -198,8 +203,8 @@
 		show: function (panel, immediate) {
 			var obj = this;
 			// event before
-			var eventData = this.trigger({ phase: 'before', type: 'show', target: panel, panel: this.get(panel), immediate: immediate });	
-			if (eventData.stop === true) return false;
+			var eventData = this.trigger({ phase: 'before', type: 'show', target: panel, object: this.get(panel), immediate: immediate });	
+			if (eventData.isCancelled === true) return false;
 	
 			var p = obj.get(panel);
 			if (p == null) return false;
@@ -242,8 +247,8 @@
 		hide: function (panel, immediate) {
 			var obj = this;
 			// event before
-			var eventData = this.trigger({ phase: 'before', type: 'hide', target: panel, panel: this.get(panel), immediate: immediate });	
-			if (eventData.stop === true) return false;
+			var eventData = this.trigger({ phase: 'before', type: 'hide', target: panel, object: this.get(panel), immediate: immediate });	
+			if (eventData.isCancelled === true) return false;
 	
 			var p = obj.get(panel);
 			if (p == null) return false;
@@ -348,7 +353,7 @@
 			var time = (new Date()).getTime();
 			// event before
 			var eventData = obj.trigger({ phase: 'before', type: 'render', target: obj.name, box: box });	
-			if (eventData.stop === true) return false;
+			if (eventData.isCancelled === true) return false;
 	
 			if (typeof box != 'undefined' && box != null) { 
 				if ($(obj.box).find('#layout_'+ obj.name +'_panel_main').length > 0) {
@@ -397,8 +402,8 @@
 			if (typeof panel == 'undefined') panel = null;
 			var time = (new Date()).getTime();
 			// event before
-			var eventData = obj.trigger({ phase: 'before', type: 'refresh', target: (typeof panel != 'undefined' ? panel : obj.name), panel: obj.get(panel) });	
-			if (eventData.stop === true) return;
+			var eventData = obj.trigger({ phase: 'before', type: 'refresh', target: (typeof panel != 'undefined' ? panel : obj.name), object: obj.get(panel) });	
+			if (eventData.isCancelled === true) return;
 	
 			obj.unlock(panel);
 			if (panel != null && typeof panel != 'undefined') {
@@ -408,6 +413,11 @@
 				var el = $('#layout_'+ obj.name +'_panel_'+ panel).css({ display: p.hidden ? 'none' : 'block' });
 				el = el.find('.w2ui-panel-content');
 				if (el.length > 0) el.css('overflow', p.overflow)[0].style.cssText += ';' + p.style;
+				if (p.resizable === true) {
+					$('#layout_'+ this.name +'_resizer_'+ panel).show(); 
+				} else {
+					$('#layout_'+ this.name +'_resizer_'+ panel).hide(); 					
+				}
 				// insert content
 				if (typeof p.content == 'object' && p.content.render) {
 					p.content.box = $('#layout_'+ obj.name + '_panel_'+ p.type +' > .w2ui-panel-content')[0];
@@ -447,7 +457,7 @@
 			var time = (new Date()).getTime();
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'resize', target: this.name, panel: this.tmp_resizing });	
-			if (eventData.stop === true) return false;
+			if (eventData.isCancelled === true) return false;
 			if (this.padding < 0) this.padding = 0;
 	
 			// layout itself
@@ -723,7 +733,7 @@
 		destroy: function () { 
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'destroy', target: this.name });	
-			if (eventData.stop === true) return false;
+			if (eventData.isCancelled === true) return false;
 			if (typeof w2ui[this.name] == 'undefined') return false;
 			// clean up
 			if ($(this.box).find('#layout_'+ this.name +'_panel_main').length > 0) {
@@ -744,58 +754,21 @@
 		},
 
 		lock: function (panel, msg, showSpinner) {
-			var obj = this;
-			if (panel == null) return;
-			if (!msg && msg != 0) msg = '';
-			if ($.inArray(panel, ['left', 'right', 'top', 'bottom', 'preview', 'main']) == -1) {
+			if ($.inArray(String(panel), ['left', 'right', 'top', 'bottom', 'preview', 'main']) == -1) {
 				console.log('ERROR: First parameter needs to be the a valid panel name.');
 				return;
 			}
-			var nm = '#layout_'+ obj.name + '_panel_' + panel;
-			if (!msg) {
-				setTimeout(function () {
-					$(nm +'_lock').remove();
-					$(nm +'_status').remove();
-				}, 25);
-			} else {
-				if (obj.get(panel).hidden == true && msg != '') {
-					console.log('ERROR: Cannot lock '+ panel +' panel because it is not visible.');
-					return;
-				}
-				$(nm +'_lock').remove();
-				$(nm +'_status').remove();
-				$(nm).find('> :first-child').before(
-					'<div id="'+ nm.substr(1) +'_lock" class="w2ui-lock"></div>'+
-					'<div id="'+ nm.substr(1) +'_status" class="w2ui-lock-msg"></div>'
-				);
-				setTimeout(function () {
-					var lock 	= $(nm +'_lock');
-					var status 	= $(nm +'_status');
-					status.data('old_opacity', status.css('opacity')).css('opacity', '0').show();
-					lock.data('old_opacity', lock.css('opacity')).css('opacity', '0').show();
-					setTimeout(function () {
-						var left 	= ($(nm).width()  - w2utils.getSize(status, 'width')) / 2;
-						var top 	= ($(nm).height() * 0.9 - w2utils.getSize(status, 'height')) / 2;
-						lock.css({
-							opacity : lock.data('old_opacity'),
-							left 	: '0px',
-							top 	: '0px',
-							width 	: '100%',
-							height 	: '100%'
-						});
-						if (showSpinner === true) msg = '<div class="w2ui-spinner"></div>' + msg;
-						status.html(msg).css({
-							opacity : status.data('old_opacity'),
-							left	: left + 'px',
-							top		: top + 'px'
-						});
-					}, 10);
-				}, 10);
-			}
+			var nm = '#layout_'+ this.name + '_panel_' + panel;
+			w2utils.lock(nm, msg, showSpinner);
 		},
 
 		unlock: function (panel) { 
-			this.lock(panel); 
+			if ($.inArray(String(panel), ['left', 'right', 'top', 'bottom', 'preview', 'main']) == -1) {
+				console.log('ERROR: First parameter needs to be the a valid panel name.');
+				return;
+			}
+			var nm = '#layout_'+ this.name + '_panel_' + panel;
+			w2utils.unlock(nm);
 		},		
 		
 		// --- INTERNAL FUNCTIONS
@@ -842,8 +815,8 @@
 			if (typeof this.tmp_resizing == 'undefined') return;
 			var panel = this.get(this.tmp_resizing);
 			// event before
-			var eventData = this.trigger({ phase: 'before', type: 'resizing', target: this.tmp_resizing, object: panel, event: evnt });	
-			if (eventData.stop === true) return false;
+			var eventData = this.trigger({ phase: 'before', type: 'resizing', target: this.tmp_resizing, object: panel, originalEvent: evnt });	
+			if (eventData.isCancelled === true) return false;
 
 			var p = $('#layout_'+ this.name + '_resizer_'+ this.tmp_resizing);
 			if (!p.hasClass('active')) p.addClass('active');

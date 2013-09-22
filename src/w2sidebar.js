@@ -6,6 +6,7 @@
 *   - Dependencies: jQuery, w2utils
 *
 * == NICE TO HAVE ==
+*	- return ids of all subitems
 *
 * == 1.3 Changes ==
 *	- animated open/close
@@ -17,6 +18,7 @@
 *   - better keyboard navigation (<- ->, space, enter)
 *	- added context menu see menuClick(), onMenuClick event, menu property 
 *	- added scrollIntoView()
+*	- added lock() and unlock()
 *
 ************************************************************************/
 
@@ -244,7 +246,7 @@
 			}
 			return this._tmp;
 		},
-		
+
 		hide: function () { // multiple arguments
 			var hidden = 0;
 			for (var a = 0; a < arguments.length; a++) {
@@ -331,11 +333,11 @@
 		},
 	
 		expand: function (id) {
-			// event before
-			var eventData = this.trigger({ phase: 'before', type: 'expand', target: id });	
-			if (eventData.stop === true) return false;
-			// default action
 			var nd = this.get(id);
+			// event before
+			var eventData = this.trigger({ phase: 'before', type: 'expand', target: id, object: nd });	
+			if (eventData.isCancelled === true) return false;
+			// default action
 			$(this.box).find('#node_'+ w2utils.escapeId(id) +'_sub').slideDown('fast');
 			$(this.box).find('#node_'+ w2utils.escapeId(id) +' .w2ui-node-dots:first-child').html('<div class="w2ui-expand">-</div>');
 			nd.expanded = true;
@@ -345,13 +347,14 @@
 		},
 		
 		collapse: function (id) {
+			var nd = this.get(id);
 			// event before
-			var eventData = this.trigger({ phase: 'before', type: 'collapse', target: id });	
-			if (eventData.stop === true) return false;
+			var eventData = this.trigger({ phase: 'before', type: 'collapse', target: id, object: nd });
+			if (eventData.isCancelled === true) return false;
 			// default action
 			$(this.box).find('#node_'+ w2utils.escapeId(id) +'_sub').slideUp('fast');		
 			$(this.box).find('#node_'+ w2utils.escapeId(id) +' .w2ui-node-dots:first-child').html('<div class="w2ui-expand">+</div>');
-			this.get(id).expanded = false;
+			nd.expanded = false;
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
 			this.resize();
@@ -401,8 +404,8 @@
 			// need timeout to allow rendering
 			setTimeout(function () {
 				// event before
-				var eventData = obj.trigger({ phase: 'before', type: 'click', target: id, event: event });	
-				if (eventData.stop === true) {
+				var eventData = obj.trigger({ phase: 'before', type: 'click', target: id, originalEvent: event, object: nd });	
+				if (eventData.isCancelled === true) {
 					// restore selection
 					$(obj.box).find('#node_'+ w2utils.escapeId(id)).removeClass('w2ui-selected').find('.w2ui-icon').removeClass('w2ui-icon-selected');
 					$(obj.box).find('#node_'+ w2utils.escapeId(old)).addClass('w2ui-selected').find('.w2ui-icon').addClass('w2ui-icon-selected');
@@ -422,8 +425,8 @@
 			var nd  = obj.get(obj.selected);
 			if (!nd || obj.keyboard !== true) return;
 			// trigger event
-			var eventData = obj.trigger({ phase: 'before', type: 'keyboard', target: obj.name, event: event });	
-			if (eventData.stop === true) return false;
+			var eventData = obj.trigger({ phase: 'before', type: 'keyboard', target: obj.name, originalEvent: event });	
+			if (eventData.isCancelled === true) return false;
 			// default behaviour
 			if (event.keyCode == 13 || event.keyCode == 32) { // enter or space
 				if (nd.nodes.length > 0) obj.toggle(obj.selected);
@@ -519,11 +522,11 @@
 
 		dblClick: function (id, event) {
 			if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection 
-			// event before
-			var eventData = this.trigger({ phase: 'before', type: 'dblClick', target: id, event: event });	
-			if (eventData.stop === true) return false;
-			// default action
 			var nd = this.get(id);
+			// event before
+			var eventData = this.trigger({ phase: 'before', type: 'dblClick', target: id, originalEvent: event, object: nd });
+			if (eventData.isCancelled === true) return false;
+			// default action
 			if (nd.nodes.length > 0) this.toggle(id);
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
@@ -531,31 +534,33 @@
 	
 		contextMenu: function (id, event) {
 			var obj = this;
-			// event before
-			var eventData = obj.trigger({ phase: 'before', type: 'contextMenu', target: id, event: event });	
-			if (eventData.stop === true) return false;		
-			// default action
-			var nd = obj.get(id);
+			var nd  = obj.get(id);
 			if (id != obj.selected) obj.click(id);
-			if (nd.group || nd.disabled) return;
-			if (obj.menu.length > 0) {
-				$(obj.box).find('#node_'+ w2utils.escapeId(id))
-					.w2menu(obj.menu, { 
-						left: event.offsetX - 25,
-						select: function (item, event, index) { obj.menuClick(id, event, index); }
-					}
-				);
-			}
-			// event after
-			obj.trigger($.extend(eventData, { phase: 'after' }));
-			return;
+			// need timeout to allow click to finish first
+			setTimeout(function () {
+				// event before
+				var eventData = obj.trigger({ phase: 'before', type: 'contextMenu', target: id, originalEvent: event, object: nd });	
+				if (eventData.isCancelled === true) return false;		
+				// default action
+				if (nd.group || nd.disabled) return;
+				if (obj.menu.length > 0) {
+					$(obj.box).find('#node_'+ w2utils.escapeId(id))
+						.w2menu(obj.menu, { 
+							left: (event.offsetX || event.pageX) - 25,
+							select: function (item, event, index) { obj.menuClick(id, event, index); }
+						}
+					);
+				}
+				// event after
+				obj.trigger($.extend(eventData, { phase: 'after' }));
+			}, 1);	
 		},
 
 		menuClick: function (itemId, event, index) {
 			var obj = this;
 			// event before
-			var eventData = obj.trigger({ phase: 'before', type: 'menuClick', target: itemId, event: event, menuIndex: index, menuItem: obj.menu[index] });	
-			if (eventData.stop === true) return false;		
+			var eventData = obj.trigger({ phase: 'before', type: 'menuClick', target: itemId, originalEvent: event, menuIndex: index, menuItem: obj.menu[index] });	
+			if (eventData.isCancelled === true) return false;		
 			// default action
 			// -- empty
 			// event after
@@ -565,7 +570,7 @@
 		render: function (box) {
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'render', target: this.name, box: box });	
-			if (eventData.stop === true) return false;
+			if (eventData.isCancelled === true) return false;
 			// default action
 			if (typeof box != 'undefined' && box != null) { 
 				if ($(this.box).find('> div > div.w2ui-sidebar-div').length > 0) {
@@ -612,7 +617,7 @@
 			if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection 
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'refresh', target: (typeof id != 'undefined' ? id : this.name) });	
-			if (eventData.stop === true) return false;
+			if (eventData.isCancelled === true) return false;
 			// adjust top and bottom
 			if (this.topHTML != '') {
 				$(this.box).find('.w2ui-sidebar-top').html(this.topHTML);
@@ -716,7 +721,7 @@
 			if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection 
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'resize', target: this.name });
-			if (eventData.stop === true) return false;
+			if (eventData.isCancelled === true) return false;
 			// default action
 			$(this.box).css('overflow', 'hidden');	// container should have no overflow
 			//$(this.box).find('.w2ui-sidebar-div').css('overflow', 'hidden');
@@ -732,7 +737,7 @@
 		destroy: function () { 
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'destroy', target: this.name });	
-			if (eventData.stop === true) return false;
+			if (eventData.isCancelled === true) return false;
 			// clean up
 			if ($(this.box).find('> div > div.w2ui-sidebar-div').length > 0) {
 				$(this.box)
@@ -743,7 +748,16 @@
 			delete w2ui[this.name];
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));	
-		}				
+		},
+
+		lock: function (msg, showSpinner) {
+			var box = $(this.box).find('> div:first-child');
+			w2utils.lock(box, msg, showSpinner);
+		},
+
+		unlock: function () { 
+			w2utils.unlock(this.box);
+		}
 	}
 	
 	$.extend(w2sidebar.prototype, $.w2event);
