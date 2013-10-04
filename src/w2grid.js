@@ -23,13 +23,15 @@
 *	- be able to attach events in advanced search dialog
 * 	- reorder columns/records
 *	- url should be either string or object, if object, then allow different urls for different actions, get-records, delete, save
+*	- bug: paste at the end of the control
+*	- bug: extend selection - bug
 *
 * == 1.3 changes ==
 *	- added onEdit, an event to catch the edit record event when you click the edit button
 *	- added toolbarEdit, to send the OnEdit event
 *	- Changed doEdit to edit one field in doEditField, to add the doEdit event to edit one record in a popup
 *	- added getRecordHTML, refactored, updated set()
-*	- added onKeyboard event
+*	- added onKeydown event
 *	- added keyboard = true property
 * 	- refresh() and resize() returns number of milliseconds it took
 *	- optimized width distribution and resize
@@ -171,7 +173,7 @@
 		this.onExpand 			= null;
 		this.onCollapse			= null;
 		this.onError 			= null;
-		this.onKeyboard			= null;
+		this.onKeydown			= null;
 		this.onToolbar			= null; 	// all events from toolbar
 		this.onColumnOnOff		= null;
 		this.onCopy				= null;
@@ -1960,7 +1962,7 @@
 			var obj = this;
 			if (obj.keyboard !== true) return;
 			// trigger event
-			var eventData = obj.trigger({ phase: 'before', type: 'keyboard', target: obj.name, event: event });
+			var eventData = obj.trigger({ phase: 'before', type: 'keydown', target: obj.name, originalEvent: event });
 			if (eventData.isCancelled === true) return false;
 			// default behavior
 			var sel 	= obj.getSelection();
@@ -2229,7 +2231,7 @@
 							}
 						} else { // move selected record
 							obj.selectNone();
-							obj.click({ recid: obj.records[next].recid, column: columns[0] });
+							obj.click({ recid: obj.records[next].recid, column: columns[0] }, event);
 						}
 						obj.scrollIntoView(next);
 						cancel = true;
