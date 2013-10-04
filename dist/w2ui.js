@@ -1246,7 +1246,7 @@ w2utils.keyboard = (function (obj) {
 *	- added toolbarEdit, to send the OnEdit event
 *	- Changed doEdit to edit one field in doEditField, to add the doEdit event to edit one record in a popup
 *	- added getRecordHTML, refactored, updated set()
-*	- added onKeyboard event
+*	- added onKeydown event
 *	- added keyboard = true property
 * 	- refresh() and resize() returns number of milliseconds it took
 *	- optimized width distribution and resize
@@ -1388,7 +1388,7 @@ w2utils.keyboard = (function (obj) {
 		this.onExpand 			= null;
 		this.onCollapse			= null;
 		this.onError 			= null;
-		this.onKeyboard			= null;
+		this.onKeydown			= null;
 		this.onToolbar			= null; 	// all events from toolbar
 		this.onColumnOnOff		= null;
 		this.onCopy				= null;
@@ -3177,7 +3177,7 @@ w2utils.keyboard = (function (obj) {
 			var obj = this;
 			if (obj.keyboard !== true) return;
 			// trigger event
-			var eventData = obj.trigger({ phase: 'before', type: 'keyboard', target: obj.name, originalEvent: event });
+			var eventData = obj.trigger({ phase: 'before', type: 'keydown', target: obj.name, originalEvent: event });
 			if (eventData.isCancelled === true) return false;
 			// default behavior
 			var sel 	= obj.getSelection();
@@ -5396,22 +5396,6 @@ w2utils.keyboard = (function (obj) {
 *	- onResize for the panel
 *	- problem with layout.html (see in 1.3)
 *	- add panel title
-*
-* == 1.3 changes ==
-*   - tabs can be array of string, array of tab objects or w2tabs object
-*	- html() method is alias for content()
-*	- el(panel) - returns DOM element for the panel
-*	- resizer should be on top of the panel (for easy styling)
-*	- content: $('content'); - it will return graceful error
-*	- % base resizes
-*	- better min/max calculation when window resizes
-*	- moved some settings to prototype
-*	- added layout.lock(panel, msg, [showSpinner]), unlock(panel)
-*	- moved to private scope startResize, stopResize, doResize functions
-*	- moved to private scope initEvents, initTabs, initToolbar
-*	- ability to load CSS into a hidden panel
-*	- added sizeTo()
-*	- added tmp property for internal use
 * 
 ************************************************************************/
 
@@ -6349,7 +6333,7 @@ w2utils.keyboard = (function (obj) {
 * == 1.3 changes ==
 *	- keyboard esc - close
 *	- w2confirm() - enter - yes, esc - no
-*	- added onKeyboard event listener
+*	- added onKeydown event listener
 *	- added callBack to w2alert(msg, title, callBack)
 *	- renamed doKeydown to keydown()
 *	- if there are no rel=, the entire html is taken as body
@@ -6431,7 +6415,7 @@ var w2popup = {};
 		onClose		: null,
 		onMax		: null,
 		onMin		: null,
-		onKeyboard  : null,
+		onKeydown   : null,
 
 		open: function (options) {
 			var obj = this;
@@ -6445,13 +6429,13 @@ var w2popup = {};
 				w2popup.onMin 	 	= null;
 				w2popup.onOpen	 	= null;
 				w2popup.onClose	 	= null;
-				w2popup.onKeyboard	= null;
+				w2popup.onKeydown	= null;
 			}
 			if (options.onOpen)		w2popup.onOpen		= options.onOpen;
 			if (options.onClose)	w2popup.onClose		= options.onClose;
 			if (options.onMax)		w2popup.onMax		= options.onMax;
 			if (options.onMin)		w2popup.onMin		= options.onMin;
-			if (options.onKeyboard)	w2popup.onKeyboard	= options.onKeyboard;
+			if (options.onKeydown)	w2popup.onKeydown	= options.onKeydown;
 
 			if (window.innerHeight == undefined) {
 				var width  = document.documentElement.offsetWidth;
@@ -6648,7 +6632,7 @@ var w2popup = {};
 			var options = $('#w2ui-popup').data('options');
 			if (!options.keyboard) return;
 			// trigger event
-			var eventData = w2popup.trigger({ phase: 'before', type: 'keyboard', target: 'popup', options: options, originalEvent: event });
+			var eventData = w2popup.trigger({ phase: 'before', type: 'keydown', target: 'popup', options: options, object: w2popup, originalEvent: event });
 			if (eventData.isCancelled === true) return;
 			// default behavior
 			switch (event.keyCode) {
@@ -7013,7 +6997,7 @@ var w2confirm = function (msg, title, callBack) {
 					if (typeof callBack == 'function') callBack(event.target.id);
 				});
 			},
-			onKeyboard: function (event) {
+			onKeydown: function (event) {
 				switch (event.originalEvent.keyCode) {
 					case 13: // enter
 						if (typeof callBack == 'function') callBack('Yes');
@@ -7044,7 +7028,7 @@ var w2confirm = function (msg, title, callBack) {
 					});
 				}
 			},
-			onKeyboard: function (event) {
+			onKeydown: function (event) {
 				switch (event.originalEvent.keyCode) {
 					case 13: // enter
 						if (typeof callBack == 'function') callBack('Yes');
@@ -7992,7 +7976,7 @@ var w2confirm = function (msg, title, callBack) {
 *
 * == 1.3 Changes ==
 *	- animated open/close
-*	- added onKeyboard event
+*	- added onKeydown event
 *	- added .keyboard = true
 *	- moved some settings to prototype
 *	- doClick -> click, doDblClick -> dblClick, doContextMenu -> contextMenu
@@ -8025,7 +8009,7 @@ var w2confirm = function (msg, title, callBack) {
 		this.onMenuClick	= null; // when context menu item selected
 		this.onExpand		= null;	// Fire when node Expands
 		this.onCollapse		= null;	// Fire when node Colapses
-		this.onKeyboard		= null;
+		this.onKeydown		= null;
 		this.onRender 		= null;
 		this.onRefresh		= null;
 		this.onResize 		= null;
@@ -8407,7 +8391,7 @@ var w2confirm = function (msg, title, callBack) {
 			var nd  = obj.get(obj.selected);
 			if (!nd || obj.keyboard !== true) return;
 			// trigger event
-			var eventData = obj.trigger({ phase: 'before', type: 'keyboard', target: obj.name, originalEvent: event });	
+			var eventData = obj.trigger({ phase: 'before', type: 'keydown', target: obj.name, originalEvent: event });	
 			if (eventData.isCancelled === true) return false;
 			// default behaviour
 			if (event.keyCode == 13 || event.keyCode == 32) { // enter or space
