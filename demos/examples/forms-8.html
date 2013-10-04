@@ -58,7 +58,9 @@ function openPopup () {
 		style	: 'padding: 15px 0px 0px 0px',
 		width	: 500,
 		height	: 300, 
-		onOpen	: function () {
+		onAfterOpen	: function () {
+			// on**AFTER**Open because the selector will only deliver AFTER the dialog/popup shell (including 'body') has been rendered.
+			// specifying an opOpen handler instead is equivalent to specifying an onBeforeOpen handler, which would make this code execute too early and hence not deliver.
 			$('#w2ui-popup #form').w2render('foo');
 		}
 	});

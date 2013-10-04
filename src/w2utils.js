@@ -869,8 +869,13 @@ $.w2event = {
 		}		
 		// main object events
 		var funName = 'on' + eventData.type.substr(0,1).toUpperCase() + eventData.type.substr(1);
-		if (eventData.phase == 'before' && typeof this[funName] == 'function') {
-			var fun = this[funName];
+		// test for both onEvent and onBeforeEvent/onAfterEvent handlers being specified: exec the latter if both are specified.
+		var funPhasedName = 'on' + eventData.phase.substr(0,1).toUpperCase() + eventData.phase.substr(1) + eventData.type.substr(0,1).toUpperCase() + eventData.type.substr(1);
+		if (typeof this[funName] === 'function' && typeof this[funPhasedName] === 'function') {
+			alert("ERROR in Main Object: user specified both basic " + funName + " and new " + funPhasedName + " event handlers; only the latter will execute!");
+		}
+		if (eventData.phase == 'before' && (typeof this[funName] === 'function' || typeof this[funPhasedName] === 'function')) {
+			var fun = (this[funName] || this[funPhasedName]);
 			// check handler arguments
 			var args = [];
 			var tmp  = RegExp(/\((.*?)\)/).exec(fun);
@@ -883,9 +888,13 @@ $.w2event = {
 			if (eventData.isStopped === true || eventData.stop === true) return eventData; // back compatibility eventData.stop === true
 		}
 		// item object events
-		if (typeof eventData.object != 'undefined' && eventData.object != null && eventData.phase == 'before'
-				&& typeof eventData.object[funName] == 'function') {
-			var fun = eventData.object[funName];
+		if (typeof eventData.object !== 'undefined' && eventData.object != null && 
+				typeof eventData.object[funName] === 'function' && typeof eventData.object[funPhasedName] === 'function') {
+			alert("ERROR in Item Object: user specified both basic " + funName + " and new " + funPhasedName + " event handlers; only the latter will execute!");
+		}
+		if (typeof eventData.object !== 'undefined' && eventData.object != null && eventData.phase == 'before'
+				&& (typeof eventData.object[funName] === 'function' || typeof eventData.object[funPhasedName] === 'function')) {
+			var fun = (eventData.object[funName] || eventData.object[funPhasedName]);
 			// check handler arguments
 			var args = [];
 			var tmp  = RegExp(/\((.*?)\)/).exec(fun);
