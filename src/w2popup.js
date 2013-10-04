@@ -104,19 +104,38 @@ var w2popup = {};
 			var old_options = $('#w2ui-popup').data('options');
 			var options = $.extend({}, this.defaults, { body : '' }, old_options, options);
 			// if new - reset event handlers
+			var event_types = [
+				'max',
+				'min',
+				'open',
+				'close',
+				'keydown'
+			];
+			var event_phases = [ 
+				'',
+				'before',
+				'after'
+			];
+			var eid, eph, ename;
 			if ($('#w2ui-popup').length == 0) {
 				w2popup.handlers	 = [];
-				w2popup.onMax 	 	= null;
-				w2popup.onMin 	 	= null;
-				w2popup.onOpen	 	= null;
-				w2popup.onClose	 	= null;
-				w2popup.onKeydown	= null;
+
+				for (eid = event_types.length; --eid >= 0; ) {
+					for (eph = event_phases.length; --eph >= 0; ) {
+						ename = 'on' + event_phases[eph].substr(0,1).toUpperCase() + event_phases[eph].substr(1) + event_types[eid].substr(0,1).toUpperCase() + event_types[eid].substr(1);
+						w2popup[ename] = null;
+					}
+				}
 			}
-			if (options.onOpen)		w2popup.onOpen		= options.onOpen;
-			if (options.onClose)	w2popup.onClose		= options.onClose;
-			if (options.onMax)		w2popup.onMax		= options.onMax;
-			if (options.onMin)		w2popup.onMin		= options.onMin;
-			if (options.onKeydown)	w2popup.onKeydown	= options.onKeydown;
+
+			for (eid = event_types.length; --eid >= 0; ) {
+				for (eph = event_phases.length; --eph >= 0; ) {
+					ename = 'on' + event_phases[eph].substr(0,1).toUpperCase() + event_phases[eph].substr(1) + event_types[eid].substr(0,1).toUpperCase() + event_types[eid].substr(1);
+					if (options[ename]) {
+						w2popup[ename] = options[ename];
+					}
+				}
+			}
 
 			if (window.innerHeight == undefined) {
 				var width  = document.documentElement.offsetWidth;
@@ -492,14 +511,16 @@ var w2popup = {};
 						'z-Index': 1500
 					}); // has to be on top of lock 
 					w2popup.lock();
-					if (typeof options.onOpen == 'function') options.onOpen();
+					if (typeof options.onAfterOpen == 'function') options.onAfterOpen();
+					else if (typeof options.onOpen == 'function') options.onOpen();
 				}, 300);
 			} else {
 				$('#w2ui-popup .w2ui-popup-message').css('z-Index', 250);
 				var options = $('#w2ui-popup .w2ui-popup-message').data('options');
 				$('#w2ui-popup .w2ui-popup-message').remove();
 				w2popup.unlock();				
-				if (typeof options.onClose == 'function') options.onClose();
+				if (typeof options.onAfterClose == 'function') options.onAfterClose();
+				else if (typeof options.onClose == 'function') options.onClose();
 			}
 			// timer needs to animation
 			setTimeout(function () {
