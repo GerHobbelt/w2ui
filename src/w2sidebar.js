@@ -523,7 +523,7 @@
 			this.trigger($.extend(eventData, { phase: 'after' }));
 			
 			function getNodeHTML(nd) {
-				var html = '';
+				var html = $("<div/>");
 				var img  = nd.img;
 				if (img == null) img = this.img;
 				var icon  = nd.icon;
@@ -538,40 +538,121 @@
 				}	
 				if (typeof nd.caption != 'undefined') nd.text = nd.caption;
 				if (nd.group) {
-					html = 
-						'<div class="w2ui-node-group"  id="node_'+ nd.id +'"'+
-						'		onclick="w2ui[\''+ obj.name +'\'].toggle(\''+ nd.id +'\'); '+
-						'				 var sp=$(this).find(\'span:nth-child(1)\'); if (sp.html() == \''+ w2utils.lang('Hide') +'\') sp.html(\''+ w2utils.lang('Show') +'\'); else sp.html(\''+ w2utils.lang('Hide') +'\');"'+
-						'		onmouseout="$(this).find(\'span:nth-child(1)\').css(\'color\', \'transparent\')" '+
-						'		onmouseover="$(this).find(\'span:nth-child(1)\').css(\'color\', \'inherit\')">'+
-						'	<span>'+ (!nd.hidden && nd.expanded ? w2utils.lang('Hide') : w2utils.lang('Show')) +'</span>'+
-						'	<span>'+ nd.text +'</span>'+
-						'</div>'+
-						'<div class="w2ui-node-sub" id="node_'+ nd.id +'_sub" style="'+ nd.style +';'+ (!nd.hidden && nd.expanded ? '' : 'display: none;') +'"></div>';
+					var w2uiNodeGroup = $('<div/>',{
+							"class": "w2ui-node-group",
+							"id": "node_"+ nd.id
+						});
+					var span1 = $('<span/>')
+						.text(!nd.hidden && nd.expanded ? w2utils.lang('Hide') : w2utils.lang('Show'));
+					var span2 = $('<span/>')
+						.text(nd.text);
+					w2uiNodeGroup
+						.append(span1)
+						.append(span2);
+					w2uiNodeGroup[0].onclick = function(event) {
+						w2ui[obj.name].toggle(nd.id);
+						var sp = $(this).find('span:nth-child(1)');
+						if(sp.html() == w2utils.lang('Hide')) {
+							sp.html(w2utils.lang('Show'));
+						} else {
+							sp.html(w2utils.lang('Hide'));
+						}
+					};
+					w2uiNodeGroup[0].onmouseout = function(event) {
+						$(this).find('span:nth-child(1)').css('color','transparent');
+					};
+					w2uiNodeGroup[0].onmouseover = function(event) {
+						$(this).find('span:nth-child(1)').css('color','inherit');
+					};
+					var w2uiNodeSub = $('<div/>', {
+							"id": "node_"+ nd.id + "_sub",
+							"class": "w2ui-node-sub"
+						})
+						.attr("style",nd.style+ (!nd.hidden && nd.expanded ? '' : 'display: none;'));
+					html
+						.append(w2uiNodeGroup)
+						.append(w2uiNodeSub);
 				} else {
 					if (nd.selected && !nd.disabled) obj.selected = nd.id;
 					var tmp = '';
-					if (img)  tmp = '<div class="w2ui-node-image w2ui-icon '+ img +	(nd.selected && !nd.disabled ? "w2ui-icon-selected" : "") +'"></div>';
-					if (icon) tmp = '<div class="w2ui-node-image"><span class="'+ icon +'"></span></div>';
-					html = 
-					'<div class="w2ui-node '+ (nd.selected ? 'w2ui-selected' : '') +' '+ (nd.disabled ? 'w2ui-disabled' : '') +'" id="node_'+ nd.id +'" style="'+ (nd.hidden ? 'display: none;' : '') +'"'+
-						'	ondblclick="w2ui[\''+ obj.name +'\'].doDblClick(\''+ nd.id +'\', event);"'+
-						'	oncontextmenu="w2ui[\''+ obj.name +'\'].doContextMenu(\''+ nd.id +'\', event); '+
-						'		if (event.preventDefault) event.preventDefault();"'+
-						'	onClick="w2ui[\''+ obj.name +'\'].doClick(\''+ nd.id +'\', event); ">'+
-						'<table cellpadding="0" cellspacing="0" style="margin-left:'+ (level*18) +'px; padding-right:'+ (level*18) +'px"><tr>'+
-						'<td class="w2ui-node-dots" nowrap onclick="w2ui[\''+ obj.name +'\'].toggle(\''+ nd.id +'\'); '+
-						'		if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;">'+ 
-						'	<div class="w2ui-expand">'	+ (nd.nodes.length > 0 ? (nd.expanded ? '-' : '+') : (nd.plus ? '+' : '')) + '</div>' +
-						'</td>'+
-						'<td class="w2ui-node-data" nowrap>'+ 
-							tmp +
-							(nd.count !== '' ? '<div class="w2ui-node-count">'+ nd.count +'</div>' : '') +
-							'<div class="w2ui-node-caption">'+ nd.text +'</div>'+
-						'</td>'+
-						'</tr></table>'+
-					'</div>'+
-					'<div class="w2ui-node-sub" id="node_'+ nd.id +'_sub" style="'+ nd.style +';'+ (!nd.hidden && nd.expanded ? '' : 'display: none;') +'"></div>';
+					if (img)  tmp = $('<div/>', {
+							"class": "w2ui-node-image w2ui-icon " + img + (nd.selected && !nd.disabled ? ' w2ui-icon-selected' : '') + '"'
+						});
+					if (icon) tmp = $('<div/>', {
+							"class": " w2ui-node-image"
+						})
+						.append($("<span/>", {
+								"class": icon
+							})
+						);
+					var w2uiNodeDiv = $('<div/>', {
+							"class": "w2ui-node "+ (nd.selected ? 'w2ui-selected' : '') +" "+ (nd.disabled ? 'w2ui-disabled' : ''),
+							"id": "node_"+nd.id,
+							"style": (nd.hidden ? 'display: none;' : '')
+						});
+					w2uiNodeDiv[0].ondblclick = function(event) {
+						w2ui[obj.name].doDblClick(nd.id, event);
+					};
+					w2uiNodeDiv[0].oncontextmenu = function(event) {
+						w2ui[obj.name].doContextMenu(nd.id, event);
+						if (event.preventDefault) {
+							event.preventDefault();
+						}
+					};
+					w2uiNodeDiv[0].onClick = function(event) {
+						w2ui[obj.name].click(nd.id, event);
+					};
+					var nodeTable = $('<table/>', {
+							"cellpadding": "0",
+							"cellspacing": "0"
+						})
+						.attr("style", "margin-left:"+ (level*18) +"px; padding-right:"+ (level*18) +"px")
+					var nodeTableRow = $('<tr/>');
+					var w2uiNodeDots = $('<td/>', {
+							"class": "w2ui-node-dots",
+							"nowrap": "nowrap"
+						});
+					var w2uiExpandDiv = $('<div/>', {
+							"class": "w2ui-expand"
+						})
+						.text((nd.nodes.length > 0 ? (nd.expanded ? '-' : '+') : (nd.plus ? '+' : '')))
+					w2uiNodeDots[0].onclick = function(event) {
+						if (event.stopPropagation) {
+							event.stopPropagation();
+						} else {
+							event.cancelBubble = true;
+						}
+						w2ui[obj.name].toggle(nd.id);
+					};
+					$(w2uiNodeDots).append(w2uiExpandDiv);
+
+					var w2nodeCount = $('<div/>', {
+							"class": "w2ui-node-count"
+						})
+						.text(nd.count);
+
+					var w2uiNodeData = $('<td/>', {
+							"class": "w2ui-node-data",
+							"nowrap": "nowrap"
+						})
+						.append(tmp)
+						.append((nd.count !== '' ? w2nodeCount : ''));
+
+					var w2uiNodeCaption = $('<div/>', {
+							"class": "w2ui-node-caption"
+						})
+						.text(nd.text);
+					$(w2uiNodeData).append(w2uiNodeCaption);
+					$(nodeTableRow).append(w2uiNodeDots);
+					$(nodeTableRow).append(w2uiNodeData);
+					$(nodeTable).append(nodeTableRow);
+					$(w2uiNodeDiv).append(nodeTable);
+					var w2uiNodeSub = $('<div/>', {
+							"class": "w2ui-node-sub",
+							"id": "node_"+ nd.id +"_sub"
+						})
+						.attr("style", nd.style +';'+ (!nd.hidden && nd.expanded ? '' : 'display: none;'));
+					html.append(w2uiNodeDiv).append(w2uiNodeSub);
 				}
 				return html;
 			}
