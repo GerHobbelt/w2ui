@@ -27,6 +27,7 @@
 *	- bug: extend selection - bug
 *	- hidden searches could not be clearned by the user
 *	- how do you easy change add/delete/edit buttons??
+*	- easy overwrite defaul toolbar icons/captions
 *
 * == 1.3 changes ==
 *	- added onEdit, an event to catch the edit record event when you click the edit button
@@ -4098,8 +4099,11 @@
 			// various renderers
 			if (data == null || typeof data == 'undefined') data = '';
 			if (typeof col.render != 'undefined') {
-				if (typeof col.render == 'function') data = col.render.call(this, record, ind, col_ind);
-				if (typeof col.render == 'object')   data = col.render[data];
+				if (typeof col.render == 'function') {
+					data = col.render.call(this, record, ind, col_ind);
+					if (data.length >= 4 && data.substr(0, 4) != '<div') data = '<div>' + data + '</div>';
+				}
+				if (typeof col.render == 'object')   data = '<div>' + col.render[data] + '</div>';
 				if (typeof col.render == 'string') {
 					var tmp = col.render.toLowerCase().split(':');
 					var prefix = '';
