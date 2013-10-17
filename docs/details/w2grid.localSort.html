@@ -1,17 +1,26 @@
-Performs local sort of the records array.
+Performs sort on local data set.
 
 <div class="definition">
-	localSort()
+	localSort([silent])
 </div>
+
+<div class="arguments">
+	<table>
+	<tr>
+		<td>silent</td>
+		<td><b>boolean</b>, indicates whether to display sort time in the status bar</td>
+	</tr>
+	</table>
+</div>
+
+Returns number of milliseconds it took to sort.
 
 <h4>Description</h4>
 
-Performs local sort of the <a class="property" href="w2grid.records">.records</a> array based on 
-<a class="property" href="w2grid.sortData">.sortData</a>. Internally, it is used only when the data source is local, however, 
-it can be used in other cases. If the data source is remote and you call this function, it will sort the data in the records 
-array (you still need to call <a class="property" href="w2grid.refresh">.refresh()</a> method). 
-If user navigates to a new page or otherwise reloads the grid, local sort will not be applied. If your data source 
-is local you do not need to call this function because it is called internally.
+Performs local sort based on the information in the <a class="property" href="w2grid.sortData">.sortData</a> array. 
+This method only works on the local data source, when <a class="property" href="w2grid.url">.url</a> property is not set. 
+This method will only sort records, you still need to call <a class="property" href="w2grid.refresh">.refresh()</a> method
+to refresh them on the screen.
 <div style="height: 10px"></div>
 
 If you have grid defined in the following way:

@@ -3,24 +3,25 @@ $(function () {
 	var main_layout = $('#main_layout').w2layout({
 		name: 'main_layout',
 		panels: [
-			{ type: 'top', size: 35, style: 'background-color: #323947; color: #C0C8D5;', hidden: true  },
+			{ type: 'top', size: 45, style: 'border: 0px; border-bottom: 1px solid silver; background-color: #fff; color: #555;', overflow: 'hidden'},
 			{ type: 'left', size: 240, resizable: true, style: 'border-right: 1px solid silver;' },
 			{ type: 'main', style: 'background-color: white;' }
 		]
 	});
-	w2ui['main_layout'].content('top', '<div style="padding: 9px;">'+
-		'Theme: '+
-		'<select onchange="$(\'#mainCSS\').attr(\'href\', this.value);">'+
-		'	<option value="../css/w2ui.css">Default Theme</option>'+
-		'	<option value="../css/w2ui-dark.css">Dark Theme</option>'+
-		'</select>&nbsp;&nbsp;&nbsp;'+
-		'Locale: '+
-		'<select onchange="w2utils.locale({ path: \'../\', lang: this.value }); alert(\'Localization is only internal functions. You need to refresh to see it.\')">'+
-		'	<option value="en-us">en-US</option>'+
-		'	<option value="fr-fr">fr-FR</option>'+
-		'	<option value="ru-ru">ru-RU</option>'+
-		'</select>'+
-		'</div>');
+	w2ui['main_layout'].content('top', '<div style="padding: 12px 20px; font-size: 18px;">W2UI 1.3 Demos</div>');
+	// w2ui['main_layout'].content('top', '<div style="padding: 9px;">'+
+	// 	'Theme: '+
+	// 	'<select onchange="$(\'#mainCSS\').attr(\'href\', this.value);">'+
+	// 	'	<option value="../css/w2ui.css">Default Theme</option>'+
+	// 	'	<option value="../css/w2ui-dark.css">Dark Theme</option>'+
+	// 	'</select>&nbsp;&nbsp;&nbsp;'+
+	// 	'Locale: '+
+	// 	'<select onchange="w2utils.locale({ path: \'../\', lang: this.value }); alert(\'Localization is only internal functions. You need to refresh to see it.\')">'+
+	// 	'	<option value="en-us">en-US</option>'+
+	// 	'	<option value="fr-fr">fr-FR</option>'+
+	// 	'	<option value="ru-ru">ru-RU</option>'+
+	// 	'</select>'+
+	// 	'</div>');
 	// init sidebar
 	w2ui['main_layout'].content('left', $().w2sidebar({
 		name: 'demo-sidebar',
@@ -184,9 +185,9 @@ $(function () {
 						   '<html>\n'+
 						   '<head>\n'+
 						   '	<title>W2UI Demo: '+ cmd +'</title>\n'+
-						   '	<link rel="stylesheet" type="text/css" href="/xxx.com/src/w2ui.css" />\n'+
-						   '	<script src="/xxx.com/libs/jquery/jquery.js"></script>\n'+
-						   '	<script type="text/javascript" src="/xxx.com/src/w2ui.js"></script>\n'+
+						   '	<link rel="stylesheet" type="text/css" href="css/w2ui.css" />\n'+
+						   '	<script src="libs/jquery/jquery.js"></script>\n'+
+						   '	<script type="text/javascript" src="src/w2ui.js"></script>\n'+
 						   '</head>\n'+
 						   '<body>\n\n'+
 						   html + '\n\n'+
