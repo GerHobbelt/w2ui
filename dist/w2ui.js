@@ -5,9 +5,10 @@ var w2obj = w2obj || {}; // expose object to be able to overwrite default functi
 /************************************************
 *   Library: Web 2.0 UI for jQuery
 *   - Following objects are defines
-*   	- w2ui 			- object that contains all created objects
-*		- w2utils 		- basic utilities
-*		- w2ui.w2evet	- generic event object
+*   	- w2ui 				- object that contains all created objects
+*		- w2utils 			- basic utilities
+*		- w2utils.event		- generic event object
+*		- w2utils.keyboard	- object for keyboard navigation
 *   - Dependencies: jQuery
 *
 * == NICE TO HAVE ==
@@ -799,7 +800,7 @@ var w2utils = (function () {
 *
 *********************************************************/
 
-$.w2event = {
+w2utils.event = {
 
 	on: function (eventData, handler) {
 		if (!$.isPlainObject(eventData)) eventData = { type: eventData };
@@ -5408,7 +5409,7 @@ w2utils.keyboard = (function (obj) {
 		}
 	}
 
-	$.extend(w2grid.prototype, $.w2event);
+	$.extend(w2grid.prototype, w2utils.event);
 	w2obj.grid = w2grid;
 })();
 /************************************************************************
@@ -6391,7 +6392,7 @@ w2utils.keyboard = (function (obj) {
 		}
 	}
 	
-	$.extend(w2layout.prototype, $.w2event);
+	$.extend(w2layout.prototype, w2utils.event);
 	w2obj.layout = w2layout;
 })();
 /************************************************************************
@@ -6415,7 +6416,7 @@ w2utils.keyboard = (function (obj) {
 *	- renamed doKeydown to keydown()
 *	- if there are no rel=, the entire html is taken as body
 *	- options.url is now for load or open methods
-*	- moved all events to w2events
+*	- moved all events to w2utils.event
 *	- aded lock() and unlock() functions
 *	- fixed w2alert() and w2confirm to work in already opend popup
 *
@@ -7032,7 +7033,7 @@ var w2popup = {};
 	}
 
 	// merge in event handling
-	$.extend(w2popup, $.w2event);
+	$.extend(w2popup, w2utils.event);
 
 })();
 
@@ -7550,7 +7551,7 @@ var w2confirm = function (msg, title, callBack) {
 		}
 	}
 	
-	$.extend(w2tabs.prototype, $.w2event);
+	$.extend(w2tabs.prototype, w2utils.event);
 	w2obj.tabs = w2tabs;
 })();
 /************************************************************************
@@ -8058,7 +8059,7 @@ var w2confirm = function (msg, title, callBack) {
 		}		
 	}
 	
-	$.extend(w2toolbar.prototype, $.w2event);
+	$.extend(w2toolbar.prototype, w2utils.event);
 	w2obj.toolbar = w2toolbar;
 })();
 /************************************************************************
@@ -8817,7 +8818,7 @@ var w2confirm = function (msg, title, callBack) {
 		}
 	}
 	
-	$.extend(w2sidebar.prototype, $.w2event);
+	$.extend(w2sidebar.prototype, w2utils.event);
 	w2obj.sidebar = w2sidebar;
 })();
 /************************************************************************
@@ -11278,6 +11279,6 @@ var w2confirm = function (msg, title, callBack) {
 		}
 	}
 	
-	$.extend(w2form.prototype, $.w2event);
+	$.extend(w2form.prototype, w2utils.event);
 	w2obj.form = w2form;
 })();
