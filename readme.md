@@ -80,7 +80,7 @@ This repository holds a lot of auxiliary files.
 
 ## Other Build Tools
 
-You can use other toold to build. Grunt seems to be promissing, and will do everything you need. You still need to install same dependencies
+You can use other tools to build. Grunt seems to be promissing, and will do everything you need. You still need to install same dependencies
 if you want to use grunt.
 
 
