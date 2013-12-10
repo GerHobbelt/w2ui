@@ -1,27 +1,19 @@
 /************************************************************************
 *   Library: Web 2.0 UI for jQuery (using prototypical inheritance)
 *   - Following objects defined
-* 		- w2ui.w2field 	- various field controls
-*		- $.w2field		- jQuery wrapper
+* 		- w2field 		- various field controls
+*		- $().w2field	- jQuery wrapper
 *   - Dependencies: jQuery, w2utils
 *
 * == NICE TO HAVE ==
 *	- select - for select, list - for drop down (needs this in grid)
 *	- enum add events: onLoad, onRequest, onCompare, onSelect, onDelete, onClick for already selected elements
-*	- enum needs events onItemClick, onItemOver, etc just like upload
 *	- upload (regular files)
 *	- enum - refresh happens on each key press even if not needed (for speed)
 *	- BUG with prefix/postfix and arrows (test in different contexts)
 *	- multiple date selection
 *	- rewrire everythin in objects (w2ftext, w2fenum, w2fdate)
-* 
-* == 1.3 changes ==
-*	- select type has options.url to pull from server
-*	- input number types with use of keyboard, prefix/suffic, arrow buttons
-*	- added render for enum, if returns === false, no item is show
-* 	- added enum onShow, onHide, onAdd, onRemove, onItemOver, onItemOut, onItemClick
-*	- enum readonly
-*	- write document on file type
+*	- render calendar to the div
 *
 ************************************************************************/
 
@@ -792,7 +784,7 @@
 							var cntHeight = $(div).find('>div').height(); //w2utils.getSize(div, 'height');
 							if (cntHeight < 23) cntHeight = 23;
 							if (cntHeight > settings.maxHeight) cntHeight = settings.maxHeight;
-							$(div).height(cntHeight);
+							$(div).height(cntHeight + (cntHeight % 23 == 0 ? 0 : 23 - cntHeight % 23) );
 							if (div.length > 0) div[0].scrollTop = 1000;
 							$(this).height(cntHeight);
 						}

@@ -1,8 +1,8 @@
 /************************************************************************
 *   Library: Web 2.0 UI for jQuery (using prototypical inheritance)
 *   - Following objects defined
-* 		- w2ui.w2grid 	- grid widget
-*		- $.w2grid		- jQuery wrapper
+* 		- w2grid 		- grid widget
+*		- $().w2grid	- jQuery wrapper
 *   - Dependencies: jQuery, w2utils, w2toolbar, w2fields, w2alert, w2confirm
 *
 * == NICE TO HAVE ==
@@ -10,7 +10,6 @@
 *	- editable fields (list) - better inline editing
 *	- frozen columns
 *	- column autosize based on largest content
-*	- more events in editable fields (onkeypress)
 *	- save grid state into localStorage and restore
 *	- search logic (AND or OR) if it is a list, it should be multiple list with or
 *	- easy bubbles in the grid
@@ -19,80 +18,9 @@
 *	- More than 2 layers of header groups
 *	- for search fields one should be able to pass w2field options
 *	- add enum to advanced search fields
-*	- all function that take recid as argument, should check if object was given and use it instead.
 *	- be able to attach events in advanced search dialog
 * 	- reorder columns/records
-*	- url should be either string or object, if object, then allow different urls for different actions, get-records, delete, save
-*	- bug: paste at the end of the control
-*	- bug: extend selection - bug
 *	- hidden searches could not be clearned by the user
-*	- how do you easy change add/delete/edit buttons??
-*	- easy overwrite defaul toolbar icons/captions
-*
-* == 1.3 changes ==
-*	- added onEdit, an event to catch the edit record event when you click the edit button
-*	- added toolbarEdit, to send the OnEdit event
-*	- Changed doEdit to edit one field in doEditField, to add the doEdit event to edit one record in a popup
-*	- added getRecordHTML, refactored, updated set()
-*	- added onKeydown event
-*	- added keyboard = true property
-* 	- refresh() and resize() returns number of milliseconds it took
-*	- optimized width distribution and resize
-*	- 50 columns resize 2% - margin of error is huge
-* 	- resize needs to be revisited without resizing each div
-*	- grid.resize should not hide expanded columns
-*	- navigation with keyboard wrong if there are summary records
-*	- added w2grid.recordHeight = 24
-*	- fixedRecord deprecated because of buffered scroll
-*	- added getSummaryHTML(), summary
-* 	- added record.changed, record.changes
-*	- doExpand -> expand, collapse, toggle, onCollapse
-*	- remove record.hidden
-*	- grid.set([recid], record, [noRefresh]) - updates all records
-*	- deprecated selectPage()
-*	- added onReload (when toolbar button is clicked)
-*	- column.title - can be a string or a function
-*	- hints for records (columns?)
-*	- select multiple records (shift) in a searched list - selects more then needed
-* 	- error when using left/right arrow keys (second click disconnects from the event listener)
-*	- deprecated recordsPerPage, page, goto()
-* 	- added onDeleted, onSaved - when it returns from the server
-* 	- added buffered, limit, offset
-* 	- need to clean up onRequest, onSave, onLoad commands
-*	- added onToolbar event - click on any toolbar button
-*	- route all toolbar events thru the grid
-*	- infinite scroll (buffered scroll)
-*	- added grid.autoLoad = true
-*	- search 1-20 will range numbers
-*	- moved some settings to prototype
-* 	- added record.expanded = 'none' || 'spinner'
-*	- added lock(.., showSpinner) - show spinner
-*	- subgrid (easy way with keyboard navigation)
-*	- on/off line number and select column
-*	- added columnOnOff() internal method
-* 	- added skip()
-* 	- added onColumnOnOff
-* 	- record.render(record, record_index, column_index)
-*	- added grid.scrollIntoView()
-*	- added render formatters (number, int, float, money, age, date)
-*	- deprecated: doAdd, doEdit
-*	- renames: doClick -> click, doDblClick -> dblClick, doEditField -> editField, doScroll -> scroll, doSort -> sort, doSave -> save, doDelete -> delete
-* 	- added status()
-*	- added copy(), paste()
-*	- added onCopy, onPaste events
-*	- added getCellHTML(index, column_index, summary)
-*	- added selectType = 'cell' then, it shows cell selection
-* 	- added addRange(), removeRange(), ranges - that draws border arround selection and grid.show.selectionBorder
-*	- added getRangeData();
-*	- changed getSelection(returnIndex) - added returnIndex parameter
-*	- added markSearchResults
-*	- added columnClick() and onColumnClick and onColumnResize
-* 	- added onColumnResize event
-*	- added mergeChanges(), renamed getChanged() -> getChanges() 
-*	- added onEditField event
-*	- improoved search(), now it does not require search definitions
-*	- grid.url can be string or object { get, save, remove }
-*	- added grid.show.recordTitles 
 *
 ************************************************************************/
 
@@ -150,10 +78,6 @@
 		this.offset			= 0;		// how many records to skip (for infinite scroll) when pulling from server
 		this.style			= '';
 		this.ranges 		= [];
-
-		this.msgDelete		= w2utils.lang('Are you sure you want to delete selected records?');
-		this.msgNotJSON 	= w2utils.lang('Returned data is not in valid JSON format.');
-		this.msgRefresh		= w2utils.lang('Refreshing...');
 
 		// events
 		this.onAdd				= null;
@@ -298,6 +222,27 @@
 	// -- Implementation of core functionality
 
 	w2grid.prototype = {
+		// ----
+		// properties that need to be in prototype		
+
+		msgDelete	: w2utils.lang('Are you sure you want to delete selected records?'),
+		msgNotJSON 	: w2utils.lang('Returned data is not in valid JSON format.'),
+		msgRefresh	: w2utils.lang('Refreshing...'),
+
+		// for easy button overwrite
+		buttons: {
+			'reload'	: { type: 'button', id: 'reload', img: 'icon-reload', hint: w2utils.lang('Reload data in the list') },
+			'columns'	: { type: 'drop', id: 'column-on-off', img: 'icon-columns', hint: w2utils.lang('Show/hide columns'), arrow: false, html: '' },
+			'search'	: { type: 'html',   id: 'search', 
+							html: '<div class="w2ui-icon icon-search-down w2ui-search-down" title="'+ w2utils.lang('Select Search Field') +'" '+ 
+								  'onclick="var obj = w2ui[$(this).parents(\'div.w2ui-grid\').attr(\'name\')]; obj.searchShowFields(this);"></div>' 
+						  },
+			'search-go'	: { type: 'check',  id: 'search-advanced', caption: w2utils.lang('Search...'), hint: w2utils.lang('Open Search Fields') },
+			'add'		: { type: 'button', id: 'add', caption: w2utils.lang('Add New'), hint: w2utils.lang('Add new record'), img: 'icon-add' },
+			'edit'		: { type: 'button', id: 'edit', caption: w2utils.lang('Edit'), hint: w2utils.lang('Edit selected record'), img: 'icon-edit', disabled: true },
+			'delete'	: { type: 'button', id: 'delete', caption: w2utils.lang('Delete'), hint: w2utils.lang('Delete selected records'), img: 'icon-delete', disabled: true },
+			'save'		: { type: 'button', id: 'save', caption: w2utils.lang('Save'), hint: w2utils.lang('Save changed records'), img: 'icon-save' }
+		},
 
 		add: function (record) {
 			if (!$.isArray(record)) record = [record];
@@ -562,14 +507,6 @@
 				if (this.searchData[s].field == field) return this.searchData[s];
 			}
 			return null;
-		},
-
-		clear: function () {
-			this.records	= [];
-			this.summary	= [];
-			this.total 		= 0;
-			this.buffered   = 0;
-			this.refresh();
 		},
 
 		localSort: function (silent) {
@@ -1342,7 +1279,7 @@
 			$(el).w2overlay(html, { left: -15, top: 7 });
 		},
 
-		searchReset: function () {
+		searchReset: function (noRefresh) {
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'search', target: this.name, searchData: [] });
 			if (eventData.isCancelled === true) return;
@@ -1359,7 +1296,8 @@
 					this.last.caption 	= w2utils.lang('All Fields');
 				}
 			}
-			this.last.multi	= false;
+			this.last.multi			= false;
+			this.last.xhr_offset 	= 0;
 			// reset scrolling position
 			this.last.scrollTop		= 0;
 			this.last.scrollLeft	= 0;
@@ -1367,17 +1305,41 @@
 			// -- clear all search field
 			this.searchClose();
 			// apply search
-			var url = (typeof this.url != 'object' ? this.url : this.url.get);
-			if (url) {
-				this.last.xhr_offset = 0;
-				this.reload();
-			} else {
-				// local search
-				this.localSearch();
-				this.refresh();
-			}
+			if (!noRefresh) this.reload();
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
+		},
+
+		clear: function (noRefresh) {
+			this.offset 			= 0;
+			this.total 				= 0;
+			this.buffered			= 0;
+			this.records			= [];
+			this.summary			= [];
+			this.last.scrollTop		= 0;
+			this.last.scrollLeft	= 0;
+			this.last.range_start	= null;
+			this.last.range_end		= null;
+			this.last.xhr_offset	= 0;
+			if (!noRefresh) this.refresh();
+		},
+
+		reset: function (noRefresh) {
+			// reset last remembered state
+			this.offset				= 0;
+			this.last.scrollTop		= 0;
+			this.last.scrollLeft	= 0;
+			this.last.selected		= [];
+			this.last.range_start	= null;
+			this.last.range_end		= null;
+			this.last.xhr_offset	= 0;
+			this.searchReset(noRefresh);
+			// initial sort
+			if (this.last.sortData != null ) this.sortData	 = this.last.sortData;
+			// select none without refresh
+			this.set({ selected: false, expanded: false }, true);
+			// refresh
+			if (!noRefresh) this.refresh();
 		},
 
 		skip: function (offset) {
@@ -1413,36 +1375,13 @@
 		reload: function (callBack) {
 			var url = (typeof this.url != 'object' ? this.url : this.url.get);
 			if (url) {
-				//this.refresh(); // show grid before pulling data
 				if (this.last.xhr_offset > 0 && this.last.xhr_offset < this.buffered) this.last.xhr_offset = this.buffered;
 				this.request('get-records', {}, null, callBack);
 			} else {
+				this.localSearch();
 				this.refresh();
 				if (typeof callBack == 'function') callBack();
 			}
-		},
-
-		reset: function (noRefresh) {
-			// reset last remembered state
-			this.offset				= 0;
-			this.searchData			= [];
-			this.last.search		= '';
-			this.last.searchIds		= [];
-			this.last.field			= 'all';
-			this.last.caption 		= w2utils.lang('All Fields');
-			this.last.logic			= 'OR';
-			this.last.scrollTop		= 0;
-			this.last.scrollLeft	= 0;
-			this.last.selected		= [];
-			this.last.range_start	= null;
-			this.last.range_end		= null;
-			this.last.xhr_offset	= 0;
-			// initial search panel
-			if (this.last.sortData != null ) this.sortData	 = this.last.sortData;
-			// select none without refresh
-			this.set({ selected: false, expanded: false }, true);
-			// refresh
-			if (!noRefresh) this.refresh();
 		},
 
 		request: function (cmd, add_params, url, callBack) {
@@ -1842,7 +1781,7 @@
 					for (var r in recs) {
 						var fld = this.columns[recs[r].column].field;
 						var ind = this.get(recs[r].recid, true);
-						if (ind != null) {
+						if (ind != null && fld != 'recid') {
 							this.records[ind][fld] = '';
 							if (this.records[ind].changed) this.records[ind].changes[fld] = '';
 						}
@@ -2102,12 +2041,11 @@
 							} else {
 								obj.click({ recid: recid, column: prev }, event);
 							}
-						}
-						function prevCell (check) {
-							var newCheck = check - 1;
-							if (newCheck < 0) return check;
-							if (obj.columns[newCheck].hidden) return findPrev(newCheck);
-							return newCheck;
+						} else {
+							// if selected more then one, then select first
+							if (!event.shiftKey) {
+								for (var s=1; s<sel.length; s++) obj.unselect(sel[s]);
+							}
 						}
 					}
 					cancel = true;
@@ -2142,12 +2080,11 @@
 							} else {
 								obj.click({ recid: recid, column: next }, event);
 							}
-						}
-						function nextCell (check) {
-							var newCheck = check + 1;
-							if (obj.columns.length == newCheck) return check;
-							if (obj.columns[newCheck].hidden) return findNext(newCheck);
-							return newCheck;
+						} else {
+							// if selected more then one, then select first
+							if (!event.shiftKey) {
+								for (var s=0; s<sel.length-1; s++) obj.unselect(sel[s]);
+							}
 						}
 					}
 					cancel = true;
@@ -2198,6 +2135,10 @@
 						obj.scrollIntoView(prev);
 						if (event.preventDefault) event.preventDefault();
 					} else {
+						// if selected more then one, then select first
+						if (!event.shiftKey) {
+							for (var s=1; s<sel.length; s++) obj.unselect(sel[s]);
+						}
 						// jump out of subgird (if first record)
 						var parent = $('#grid_'+ obj.name +'_rec_'+ w2utils.escapeId(obj.records[ind].recid)).parents('tr');
 						if (parent.length > 0 && String(parent.attr('id')).indexOf('expanded_row') != -1) {
@@ -2257,6 +2198,10 @@
 						obj.scrollIntoView(next);
 						cancel = true;
 					} else {
+						// if selected more then one, then select first
+						if (!event.shiftKey) {
+							for (var s=0; s<sel.length-1; s++) obj.unselect(sel[s]);
+						}
 						// jump out of subgrid (if last record in subgrid)
 						var parent = $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(obj.records[ind2].recid)).parents('tr');
 						if (parent.length > 0 && String(parent.attr('id')).indexOf('expanded_row') != -1) {
@@ -2342,6 +2287,20 @@
 				} else {
 					return null;
 				}
+			}
+
+			function nextCell (check) {
+				var newCheck = check + 1;
+				if (obj.columns.length == newCheck) return check;
+				if (obj.columns[newCheck].hidden) return findNext(newCheck);
+				return newCheck;
+			}
+
+			function prevCell (check) {
+				var newCheck = check - 1;
+				if (newCheck < 0) return check;
+				if (obj.columns[newCheck].hidden) return findPrev(newCheck);
+				return newCheck;
 			}
 
 			function tmpUnselect () {
@@ -2615,6 +2574,7 @@
 				var rec  = this.records[ind];
 				var cols = [];
 				for (var dt in tmp) {
+					if (!this.columns[col + cnt]) continue;
 					var field = this.columns[col + cnt].field;
 					rec.changed = true;
 					rec.changes = rec.changes || {};
@@ -2839,11 +2799,21 @@
 			// init footer
 			$('#grid_'+ this.name +'_footer').html(this.getFooterHTML());
 			// refresh
+			this.refresh(); // show empty grid (need it)
 			this.reload();
 
 			// init mouse events for mouse selection
 			$(this.box).on('mousedown', mouseStart);			
 			$(this.box).on('selectstart', function () { return false; }); // fixes chrome cursror bug
+
+			// event after
+			this.trigger($.extend(eventData, { phase: 'after' }));
+			// attach to resize event
+			if ($('.w2ui-layout').length == 0) { // if there is layout, it will send a resize event
+				this.tmp_resize = function (event) { w2ui[obj.name].resize(); }
+				$(window).off('resize', this.tmp_resize).on('resize', this.tmp_resize);
+			}
+			return (new Date()).getTime() - time;
 
 			function mouseStart (event) {
 				if (obj.last.move && obj.last.move.type == 'expand') return;
@@ -2928,14 +2898,6 @@
 				$(document).off('mousemove', mouseMove);
 				$(document).off('mouseup', mouseStop);
 			}			
-			// event after
-			this.trigger($.extend(eventData, { phase: 'after' }));
-			// attach to resize event
-			if ($('.w2ui-layout').length == 0) { // if there is layout, it will send a resize event
-				this.tmp_resize = function (event) { w2ui[obj.name].resize(); }
-				$(window).off('resize', this.tmp_resize).on('resize', this.tmp_resize);
-			}
-			return (new Date()).getTime() - time;
 		},
 
 		destroy: function () {
@@ -3060,10 +3022,10 @@
 				// ------ Toolbar Generic buttons
 
 				if (this.show.toolbarReload) {
-					this.toolbar.items.push({ type: 'button', id: 'reload', img: 'icon-reload', hint: w2utils.lang('Reload data in the list') });
+					this.toolbar.items.push(this.buttons['reload']);
 				}
 				if (this.show.toolbarColumns) {
-					this.toolbar.items.push({ type: 'drop', id: 'column-on-off', img: 'icon-columns', hint: w2utils.lang('Show/hide columns'), arrow: false, html: '' });
+					this.toolbar.items.push(this.buttons['columns']);
 					this.initColumnOnOff();
 				}
 				if (this.show.toolbarReload || this.show.toolbarColumn) {
@@ -3073,10 +3035,7 @@
 					var html =
 						'<div class="w2ui-toolbar-search">'+
 						'<table cellpadding="0" cellspacing="0"><tr>'+
-						'	<td>'+
-						'		<div class="w2ui-icon icon-search-down w2ui-search-down" title="'+ w2utils.lang('Select Search Field') +'" '+
-									(this.isIOS ? 'onTouchStart' : 'onClick') +'="var obj = w2ui[\''+ this.name +'\']; obj.searchShowFields(this);"></div>'+
-						'	</td>'+
+						'	<td>'+ this.buttons['search'].html +'</td>'+
 						'	<td>'+
 						'		<input id="grid_'+ this.name +'_search_all" class="w2ui-search-all" '+
 						'			placeholder="'+ this.last.caption +'" value="'+ this.last.search +'"'+
@@ -3094,26 +3053,26 @@
 						'</div>';
 					this.toolbar.items.push({ type: 'html', id: 'search', html: html });
 					if (this.multiSearch && this.searches.length > 0) {
-						this.toolbar.items.push({ type: 'check', id: 'search-advanced', caption: w2utils.lang('Search...'), hint: w2utils.lang('Open Search Fields') });
+						this.toolbar.items.push(this.buttons['search-go']);
 					}
 				}
 				if (this.show.toolbarSearch && (this.show.toolbarAdd || this.show.toolbarEdit || this.show.toolbarDelete || this.show.toolbarSave)) {
 					this.toolbar.items.push({ type: 'break', id: 'break1' });
 				}
 				if (this.show.toolbarAdd) {
-					this.toolbar.items.push({ type: 'button', id: 'add', caption: w2utils.lang('Add New'), hint: w2utils.lang('Add new record'), img: 'icon-add' });
+					this.toolbar.items.push(this.buttons['add']);
 				}
 				if (this.show.toolbarEdit) {
-					this.toolbar.items.push({ type: 'button', id: 'edit', caption: w2utils.lang('Edit'), hint: w2utils.lang('Edit selected record'), img: 'icon-edit', disabled: true });
+					this.toolbar.items.push(this.buttons['edit']);
 				}
 				if (this.show.toolbarDelete) {
-					this.toolbar.items.push({ type: 'button', id: 'delete', caption: w2utils.lang('Delete'), hint: w2utils.lang('Delete selected records'), img: 'icon-delete', disabled: true });
+					this.toolbar.items.push(this.buttons['delete']);
 				}
 				if (this.show.toolbarSave) {
 					if (this.show.toolbarAdd || this.show.toolbarDelete || this.show.toolbarEdit) {
 						this.toolbar.items.push({ type: 'break', id: 'break2' });
 					}
-					this.toolbar.items.push({ type: 'button', id: 'save', caption: w2utils.lang('Save'), hint: w2utils.lang('Save changed records'), img: 'icon-save' });
+					this.toolbar.items.push(this.buttons['save']);
 				}
 				// add original buttons
 				for (var i in tmp_items) this.toolbar.items.push(tmp_items[i]);
@@ -3130,7 +3089,15 @@
 						case 'reload':
 							var eventData2 = obj.trigger({ phase: 'before', type: 'reload', target: obj.name });
 							if (eventData2.isCancelled === true) return false;
-							// obj.reset(true); // do not reset to preserve search and sort
+							var url = (typeof obj.url != 'object' ? obj.url : obj.url.get);
+							if (url) {
+								obj.clear(true); 
+							} else {
+								obj.last.scrollTop	= 0;
+								obj.last.scrollLeft	= 0;
+								obj.last.range_start= null;
+								obj.last.range_end	= null;
+							}
 							obj.reload();
 							obj.trigger($.extend(eventData2, { phase: 'after' }));
 							break;
