@@ -50,7 +50,8 @@ $(function () {
 					{ id: 'layout-6', text: 'Event Listeners', icon: 'fa-columns' },
 					{ id: 'layout-7', text: 'Nested Layouts', icon: 'fa-columns' },
 					{ id: 'layout-8', text: 'Panel With Tabs', icon: 'fa-columns' },
-					{ id: 'layout-9', text: 'Panel With Toolbar', icon: 'fa-columns' }
+					{ id: 'layout-9', text: 'Panel With Toolbar', icon: 'fa-columns' },
+					{ id: 'layout-10', text: 'Panel With Title', icon: 'fa-columns' }
 				]
 			},
 			{ id: 'grid', text: 'Grid', img: 'icon-folder', group1: true,
@@ -104,6 +105,14 @@ $(function () {
 					{ id: 'sidebar-6', text: 'Select/Unselect', icon: 'fa-hand-left' },
 					{ id: 'sidebar-8', text: 'Top & Bottom HTML', icon: 'fa-hand-left' },
 					{ id: 'sidebar-7', text: 'Events', icon: 'fa-hand-left' }
+				]
+			},
+			{ id: 'listview', text: 'ListView', img: 'icon-folder', group1: true,
+				nodes: [
+					{ id: 'listview-1', text: 'Simple ListView', icon: 'fa-folder-close-alt' },
+					{ id: 'listview-2', text: 'Different view types', icon: 'fa-folder-close-alt' },
+					{ id: 'listview-3', text: 'Selecting items', icon: 'fa-folder-close-alt' },
+					{ id: 'listview-4', text: 'Add/Remove items', icon: 'fa-folder-close-alt' }
 				]
 			},
 			{ id: 'tabs', text: 'Tabs', img: 'icon-folder', group1: true,
@@ -251,6 +260,10 @@ $(function () {
 				w2ui['demo-sidebar'].click(tmp[1] || 'sidebar-1');
 				break;
 
+			case '#!listview':
+				w2ui['demo-sidebar'].expand('listview');
+				w2ui['demo-sidebar'].click(tmp[1] || 'listview-1');
+				break;
 			case '#!tabs':
 				w2ui['demo-sidebar'].expand('tabs');
 				w2ui['demo-sidebar'].click(tmp[1] || 'tabs-1');
@@ -281,7 +294,7 @@ function initCode() {
 		var cm = CodeMirror(
 			function(elt) { text[0].parentNode.replaceChild(elt, text[0]); }, 
 			{
-					value		: $.trim(text.val()),
+				value		: $.trim(text.val()),
 				mode		: "text/html",
 				readOnly	: true,
 				gutter		: true,
@@ -305,9 +318,9 @@ function initCode() {
 		cm.setSize(null, cm.doc.height + 15);
 	}
 	$('#example_code .jsfiddle').on('click', function () {
-		$('#fiddleForm textarea[name=html]').val(html);
-		$('#fiddleForm textarea[name=js]').val(js);
-		$('#fiddleForm textarea[name=css]').val(css);
+		// $('#fiddleForm textarea[name=html]').val(html || '');
+		// $('#fiddleForm textarea[name=js]').val(js || '');
+		// $('#fiddleForm textarea[name=css]').val(css || '');
 		$('#fiddleForm').submit();
 	});
 }

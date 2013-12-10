@@ -11,6 +11,9 @@
 * 	- transition should include title, body and buttons, not just body
 *	- add lock method() to lock popup content
 *
+* == 1.4 changes
+*	- deleted getSelection().removeAllRanges() - see https://github.com/vitmalina/w2ui/issues/323
+*
 ************************************************************************/
 
 var w2popup = {};
@@ -522,7 +525,9 @@ var w2popup = {};
 		},
 
 		lock: function (msg, showSpinner) {
-			w2utils.lock($('#w2ui-popup'), msg, showSpinner);
+			var args = Array.prototype.slice.call(arguments, 0);
+			args.unshift($('#w2ui-popup'));
+			w2utils.lock.apply(window, args);
 		},
 
 		unlock: function () { 
@@ -561,7 +566,7 @@ var w2popup = {};
 						'-o-transition': '.1s', 
 						'opacity': '0.6'
 					});			
-					if (window.getSelection) window.getSelection().removeAllRanges();
+					// if (window.getSelection) window.getSelection().removeAllRanges();
 				}); 
 				$('#w2ui-lock').on('mouseup', function () {
 					setTimeout(function () {
@@ -573,7 +578,7 @@ var w2popup = {};
 							'opacity': options.opacity
 						});
 					}, 100);
-					if (window.getSelection) window.getSelection().removeAllRanges();
+					// if (window.getSelection) window.getSelection().removeAllRanges();
 				});
 			} else {
 				$('#w2ui-lock').on('mouseup', function () { w2popup.close(); });

@@ -1,4 +1,4 @@
-/* w2ui 1.3 (c) http://w2ui.com, vitmalina@gmail.com */
+/* w2ui 1.4.x (nightly) (c) http://w2ui.com, vitmalina@gmail.com */
 /*************************************************
 * --- Reset (used for all w2ui wdigetes)
 * --- The reset is needed to coexist with other CSS
@@ -16,7 +16,6 @@
   font-family: Verdana, Arial;
   font-size: 11px;
   /* font-weight: normal; - if enabled, then tr cannot have font-weight: bold; */
-
   line-height: 100%;
   -webkit-box-sizing: border-box;
   -moz-box-sizing: border-box;
@@ -258,7 +257,7 @@ select {
   font-size: 13px;
   font-family: Verdana, Arial;
   opacity: 0.8;
-  filter: alpha(opacity=15);
+  filter: alpha(opacity=80);
   background-color: #555555;
   color: #ffffff;
   text-align: center;
@@ -425,7 +424,6 @@ select {
 }
 .w2ui-field {
   /* do not include width */
-
   margin-bottom: 3px;
   margin-left: 128px;
   padding: 3px;
@@ -495,11 +493,8 @@ select {
   -o-user-select: none;
   user-select: none;
   /* create an arrow that points down */
-
   /* create an arrow that points left */
-
   /* create an arrow that points right */
-
 }
 .w2ui-field-helper .w2ui-field-up {
   position: absolute;
@@ -522,13 +517,10 @@ select {
   height: 0;
   border-left: 4px solid transparent;
   /* left arrow slant */
-
   border-right: 4px solid transparent;
   /* right arrow slant */
-
   border-bottom: 5px solid #777;
   /* bottom, add background color here */
-
   font-size: 0;
   line-height: 0;
 }
@@ -546,13 +538,10 @@ select {
   height: 0;
   border-bottom: 4px solid transparent;
   /* left arrow slant */
-
   border-top: 4px solid transparent;
   /* right arrow slant */
-
   border-right: 5px solid #777;
   /* bottom, add background color here */
-
   font-size: 0;
   line-height: 0;
 }
@@ -561,13 +550,10 @@ select {
   height: 0;
   border-bottom: 4px solid transparent;
   /* left arrow slant */
-
   border-top: 4px solid transparent;
   /* right arrow slant */
-
   border-left: 5px solid #777;
   /* bottom, add background color here */
-
   font-size: 0;
   line-height: 0;
 }
@@ -951,6 +937,11 @@ select {
   position: absolute;
   z-index: 120;
 }
+.w2ui-layout > div .w2ui-panel .w2ui-panel-title {
+  padding: 5px;
+  background-color: #f0f0f0;
+  border-bottom: 1px solid #c0c0c0;
+}
 .w2ui-layout > div .w2ui-panel .w2ui-panel-tabs {
   position: absolute;
   left: 0px;
@@ -1116,7 +1107,6 @@ select {
   background-image: none;
   background-color: rgba(0, 0, 0, 0);
   /* needed for IE */
-
   padding: 0px;
   margin: 0px;
   width: 6px;
@@ -1405,7 +1395,6 @@ select {
   position: absolute;
   border: 2px solid #6299DA;
   /* #457FC2; */
-
   pointer-events: none;
 }
 .w2ui-ss .w2ui-grid-body .w2ui-selection .w2ui-selection-resizer {
@@ -1737,12 +1726,7 @@ select {
   width: 100%;
 }
 .w2ui-sidebar .w2ui-sidebar-div .w2ui-node {
-  background-image: -webkit-linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0));
-  background-image: -moz-linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0));
-  background-image: -ms-linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0));
-  background-image: -o-linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0));
-  background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0));
-  filter: progid:dximagetransform.microsoft.gradient(startColorstr='#ff000000', endColorstr='#ff000000', GradientType=0);
+  background-color: rgba(0, 0, 0, 0);
   border-top: 1px solid transparent;
   border-bottom: 1px solid transparent;
   margin: 0px;
@@ -1768,12 +1752,7 @@ select {
 .w2ui-sidebar .w2ui-sidebar-div .w2ui-node:hover {
   border-top: 1px solid #373f52;
   border-bottom: 1px solid #373f52;
-  background-image: -webkit-linear-gradient(#373f52, #373f52);
-  background-image: -moz-linear-gradient(#373f52, #373f52);
-  background-image: -ms-linear-gradient(#373f52, #373f52);
-  background-image: -o-linear-gradient(#373f52, #373f52);
-  background-image: linear-gradient(#373f52, #373f52);
-  filter: progid:dximagetransform.microsoft.gradient(startColorstr='#ff373f52', endColorstr='#ff373f52', GradientType=0);
+  background-color: #373f52;
 }
 .w2ui-sidebar .w2ui-sidebar-div .w2ui-node .w2ui-node-image {
   width: 22px;
@@ -1785,12 +1764,7 @@ select {
 }
 .w2ui-sidebar .w2ui-sidebar-div .w2ui-selected,
 .w2ui-sidebar .w2ui-sidebar-div .w2ui-selected:hover {
-  background-image: -webkit-linear-gradient(#202530, #202530);
-  background-image: -moz-linear-gradient(#202530, #202530);
-  background-image: -ms-linear-gradient(#202530, #202530);
-  background-image: -o-linear-gradient(#202530, #202530);
-  background-image: linear-gradient(#202530, #202530);
-  filter: progid:dximagetransform.microsoft.gradient(startColorstr='#ff202530', endColorstr='#ff202530', GradientType=0);
+  background-color: #202530;
   border-top: 1px solid #111111;
   border-bottom: 1px solid #111111;
 }
@@ -1807,12 +1781,7 @@ select {
 }
 .w2ui-sidebar .w2ui-sidebar-div .w2ui-disabled,
 .w2ui-sidebar .w2ui-sidebar-div .w2ui-disabled:hover {
-  background-image: -webkit-linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0));
-  background-image: -moz-linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0));
-  background-image: -ms-linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0));
-  background-image: -o-linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0));
-  background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0));
-  filter: progid:dximagetransform.microsoft.gradient(startColorstr='#ff000000', endColorstr='#ff000000', GradientType=0);
+  background-color: rgba(0, 0, 0, 0);
   border-top: 1px solid transparent;
   border-bottom: 1px solid transparent;
 }
@@ -1825,7 +1794,7 @@ select {
 .w2ui-sidebar .w2ui-sidebar-div .w2ui-disabled td.w2ui-node-dots,
 .w2ui-sidebar .w2ui-sidebar-div .w2ui-disabled:hover td.w2ui-node-dots {
   opacity: 0.4;
-  filter: alpha(opacity=15);
+  filter: alpha(opacity=40);
   color: #c0c8d5 !important;
   text-shadow: 0px 0px 0px #ffffff !important;
 }
@@ -1979,7 +1948,7 @@ select {
 }
 .w2ui-toolbar .disabled {
   opacity: 0.3;
-  filter: alpha(opacity=15);
+  filter: alpha(opacity=30);
 }
 .w2ui-toolbar table {
   table-layout: auto !important;
@@ -2078,4 +2047,183 @@ select {
   color: #516173;
   display: inline-block;
   padding-top: 4px;
+}
+.w2ui-listview {
+  overflow: auto !important;
+  background-color: #434d64 !important;
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  -ms-box-sizing: border-box;
+  -o-box-sizing: border-box;
+  box-sizing: border-box;
+}
+.w2ui-listview * {
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  -ms-box-sizing: border-box;
+  -o-box-sizing: border-box;
+  box-sizing: border-box;
+}
+.w2ui-listview > ul {
+  list-style-type: none;
+  font-size: 0;
+  margin: 0;
+  cursor: default;
+}
+.w2ui-listview > ul > li {
+  display: inline-block;
+  vertical-align: top;
+  overflow: hidden;
+  font-size: medium;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -o-user-select: none;
+  user-select: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+.w2ui-listview > ul > li.w2ui-focused {
+  border: 1px solid #111111;
+}
+.w2ui-listview > ul > li.w2ui-selected {
+  border: 1px solid #111111;
+}
+.w2ui-listview > ul > li.w2ui-selected,
+.w2ui-listview > ul > li.w2ui-selected:hover {
+  background-color: #202530;
+}
+.w2ui-listview > ul > li.w2ui-selected div,
+.w2ui-listview > ul > li.w2ui-selected:hover div {
+  color: #eeeeee !important;
+}
+.w2ui-listview > ul > li:hover {
+  background-color: #373f52;
+  border: 1px solid #111111;
+}
+.w2ui-listview > ul > li div {
+  overflow: hidden;
+  color: #c0c8d5;
+}
+.w2ui-listview > ul > li div.icon-small {
+  font-size: 21px;
+}
+.w2ui-listview > ul > li div.icon-medium {
+  font-size: 57px;
+}
+.w2ui-listview > ul > li div.icon-large {
+  font-size: 114px;
+}
+.w2ui-listview > ul > li div.caption {
+  display: block;
+  text-align: center;
+  word-wrap: break-word;
+  max-height: 50px;
+  font-size: 80%;
+}
+.w2ui-listview > ul > li div.description {
+  display: none;
+  text-align: left;
+  color: #808080;
+  font-size: 80%;
+}
+.w2ui-icon-small > ul {
+  padding: 1px 0px 0px 1px;
+}
+.w2ui-icon-small > ul > li {
+  margin: 0px 1px 1px 0px;
+  padding: 2px;
+  width: 250px;
+  white-space: nowrap;
+}
+.w2ui-icon-small > ul > li div.icon-small {
+  display: inline-block;
+  width: 26px;
+  height: 22px;
+  float: left;
+  margin-right: 2px;
+}
+.w2ui-icon-small > ul > li div.icon-medium {
+  display: none;
+}
+.w2ui-icon-small > ul > li div.icon-large {
+  display: none;
+}
+.w2ui-icon-small > ul > li div.caption {
+  display: inline-block;
+  vertical-align: middle;
+  text-align: left;
+}
+.w2ui-icon-medium > ul {
+  padding: 4px 0px 0px 4px;
+}
+.w2ui-icon-medium > ul > li {
+  margin: 0px 4px 4px 0px;
+  padding: 4px;
+  width: 100px;
+}
+.w2ui-icon-medium > ul > li div.icon-small {
+  display: none;
+}
+.w2ui-icon-medium > ul > li div.icon-medium {
+  margin-left: auto;
+  margin-right: auto;
+  display: block;
+  width: 92px;
+  height: 60px;
+}
+.w2ui-icon-medium > ul > li div.icon-large {
+  display: none;
+}
+.w2ui-icon-large > ul {
+  padding: 4px 0px 0px 4px;
+}
+.w2ui-icon-large > ul > li {
+  margin: 0px 4px 4px 0px;
+  padding: 4px;
+  width: 160px;
+}
+.w2ui-icon-large > ul > li div.icon-small {
+  display: none;
+}
+.w2ui-icon-large > ul > li div.icon-medium {
+  display: none;
+}
+.w2ui-icon-large > ul > li div.icon-large {
+  margin-left: auto;
+  margin-right: auto;
+  display: block;
+  width: 152px;
+  height: 120px;
+}
+.w2ui-icon-tile > ul {
+  padding: 1px 0px 0px 1px;
+}
+.w2ui-icon-tile > ul > li {
+  margin: 0px 1px 1px 0px;
+  padding: 5px;
+  width: 250px;
+  white-space: nowrap;
+}
+.w2ui-icon-tile > ul > li div.icon-small {
+  display: none;
+}
+.w2ui-icon-tile > ul > li div.icon-medium {
+  display: inline-block;
+  width: 72px;
+  height: 60px;
+  float: left;
+  margin-right: 5px;
+}
+.w2ui-icon-tile > ul > li div.icon-large {
+  display: none;
+}
+.w2ui-icon-tile > ul > li div.caption {
+  text-align: left;
+}
+.w2ui-icon-tile > ul > li div.description {
+  display: block;
+}
+.w2ui-listview > ul > li div.icon-none {
+  border: 1px solid rgba(17, 17, 17, 0.35);
 }

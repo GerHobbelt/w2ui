@@ -15,9 +15,22 @@ a small footprint and no dependencies except jQuery. The library has the followi
 The complete library is only **56Kb** (minified & gzipped)
 
 
+## Who Uses It
+
+If you're using w2ui I'd love to hear about it and will be compiling a list of projects that use it. Please email me at vitmalina@gmail.com and
+if you can included name of you company (or project) and a link (if it is on a public website), that would be fantastic.
+
 ## Quick Start
 
-Current stable version is 1.3. You can download it from here: [http://w2ui.com](http://w2ui.com).
+Current stable version is 1.3. 
+
+You can:
+- Download from here: [http://w2ui.com](http://w2ui.com) 
+- Install using bower
+
+```
+bower install w2ui
+```
 
 To start using the library you need to include into your page:
 

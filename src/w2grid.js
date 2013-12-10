@@ -3,7 +3,7 @@
 *   - Following objects defined
 * 		- w2grid 		- grid widget
 *		- $().w2grid	- jQuery wrapper
-*   - Dependencies: jQuery, w2utils, w2toolbar, w2fields, w2alert, w2confirm
+*	- Dependencies: jQuery, w2utils, w2toolbar, w2fields, w2alert, w2confirm
 *
 * == NICE TO HAVE ==
 *	- global search apply types and drop downs
@@ -21,6 +21,13 @@
 *	- be able to attach events in advanced search dialog
 * 	- reorder columns/records
 *	- hidden searches could not be clearned by the user
+*	- search-logic -> searchLogic
+*	- allow to define different recid (possibly)
+*
+* == 1.4 changes
+* 	- added refreshRow(recid) - should it be part of refresh?
+* 	- added refreshCell(recid, field) - should it be part of refresh?
+*	- deleted getSelection().removeAllRanges() - see https://github.com/vitmalina/w2ui/issues/323
 *
 ************************************************************************/
 
@@ -28,7 +35,7 @@
 	var w2grid = function(options) {
 
 		// public properties
-		this.name  	  			= null;
+		this.name				= null;
 		this.box				= null; 	// HTML element that hold this element
 		this.header				= '';
 		this.url				= '';
@@ -60,7 +67,7 @@
 			toolbarSave		: false,
 			selectionBorder : true,
 			recordTitles	: true
-		}
+		};
 
 		this.autoLoad		= true; 	// for infinite scroll
 		this.fixedBody		= true;		// if false; then grid grows with data
@@ -85,7 +92,7 @@
 		this.onRequest			= null;		// called on any server event
 		this.onLoad				= null;
 		this.onDelete			= null;
-		this.onDeleted			= null
+		this.onDeleted			= null;
 		this.onSave 			= null;
 		this.onSaved			= null;
 		this.onSelect			= null;
@@ -120,10 +127,16 @@
 			logic		: 'OR',
 			search		: '',
 			searchIds 	: [],
+			selection 	: {
+				recids 	: [],
+				columns	: {},
+				clean	: function () {
+					console.log('selection clean')
+				}
+			},
 			multi		: false,
 			scrollTop	: 0,
 			scrollLeft	: 0,
-			selected	: [],
 			sortData	: null,
 			sortCount	: 0,
 			xhr			: null,
@@ -132,7 +145,7 @@
 			sel_ind		: null,
 			sel_col		: null,
 			sel_type	: null
-		}
+		};
 
 		this.isIOS = (navigator.userAgent.toLowerCase().indexOf('iphone') != -1 ||
 			navigator.userAgent.toLowerCase().indexOf('ipod') != -1 ||
@@ -146,19 +159,8 @@
 
 	$.fn.w2grid = function(method) {
 		if (typeof method === 'object' || !method ) {
-			// check required parameters
-			if (!method || typeof method.name == 'undefined') {
-				console.log('ERROR: The parameter "name" is required but not supplied in $().w2grid().');
-				return;
-			}
-			if (typeof w2ui[method.name] != 'undefined') {
-				console.log('ERROR: The parameter "name" is not unique. There are other objects already created with the same name (obj: '+ method.name +').');
-				return;
-			}
-			if (!w2utils.isAlphaNumeric(method.name)) {
-				console.log('ERROR: The parameter "name" has to be alpha-numeric (a-z, 0-9, dash and underscore). ');
-				return;
-			}
+			// check name parameter
+			if (!$.fn.w2checkNameParam(method, 'w2grid')) return;
 			// remember items
 			var columns		= method.columns;
 			var columnGroups= method.columnGroups;
@@ -223,7 +225,7 @@
 
 	w2grid.prototype = {
 		// ----
-		// properties that need to be in prototype		
+		// properties that need to be in prototype
 
 		msgDelete	: w2utils.lang('Are you sure you want to delete selected records?'),
 		msgNotJSON 	: w2utils.lang('Returned data is not in valid JSON format.'),
@@ -233,9 +235,9 @@
 		buttons: {
 			'reload'	: { type: 'button', id: 'reload', img: 'icon-reload', hint: w2utils.lang('Reload data in the list') },
 			'columns'	: { type: 'drop', id: 'column-on-off', img: 'icon-columns', hint: w2utils.lang('Show/hide columns'), arrow: false, html: '' },
-			'search'	: { type: 'html',   id: 'search', 
-							html: '<div class="w2ui-icon icon-search-down w2ui-search-down" title="'+ w2utils.lang('Select Search Field') +'" '+ 
-								  'onclick="var obj = w2ui[$(this).parents(\'div.w2ui-grid\').attr(\'name\')]; obj.searchShowFields(this);"></div>' 
+			'search'	: { type: 'html',   id: 'search',
+							html: '<div class="w2ui-icon icon-search-down w2ui-search-down" title="'+ w2utils.lang('Select Search Field') +'" '+
+								  'onclick="var obj = w2ui[$(this).parents(\'div.w2ui-grid\').attr(\'name\')]; obj.searchShowFields(this);"></div>'
 						  },
 			'search-go'	: { type: 'check',  id: 'search-advanced', caption: w2utils.lang('Search...'), hint: w2utils.lang('Open Search Fields') },
 			'add'		: { type: 'button', id: 'add', caption: w2utils.lang('Add New'), hint: w2utils.lang('Add new record'), img: 'icon-add' },
@@ -267,12 +269,16 @@
 
 		find: function (obj, returnIndex) {
 			if (typeof obj == 'undefined' || obj == null) obj = {};
-			var recs = [];
+			var recs	= [];
+			var hasDots	= false;
+			// check if property is nested - needed for speed
+			for (var o in obj) if (String(o).indexOf('.') != -1) hasDots = true;
+			// look for an item
 			for (var i=0; i<this.records.length; i++) {
 				var match = true;
 				for (var o in obj) {
 					var val = this.records[i][o];
-					if (String(o).indexOf('.') != -1) val = this.parseField(this.records[i],o);
+					if (hasDots && String(o).indexOf('.') != -1) val = this.parseField(this.records[i], o);
 					if (obj[o] != val) match = false;
 				}
 				if (match && returnIndex !== true) recs.push(this.records[i]);
@@ -296,18 +302,8 @@
 			} else { // find record to update
 				var ind = this.get(recid, true);
 				if (ind == null) return false;
-				$.extend(true, this.records[ind], record);
-				// refresh only that record
-				if (noRefresh !== true) {
-					var tr = $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(recid));
-					if (tr.length != 0) {
-						var line = tr.attr('line');
-						// if it is searched, find index in search array
-						var url = (typeof this.url != 'object' ? this.url : this.url.get);
-						if (this.searchData.length > 0 && !url) for (var s in this.last.searchIds) if (this.last.searchIds[s] == ind) ind = s;
-						$(tr).replaceWith(this.getRecordHTML(ind, line));
-					}
-				}
+				$.extend(true, this.records[ind], record);				
+				if (noRefresh !== true) this.refreshRow(recid); // refresh only that record
 			}
 			return true;
 		},
@@ -385,7 +381,7 @@
 				for (var r = this.columns.length-1; r >= 0; r--) {
 					if (this.columns[r].field == arguments[a]) {
 						this.columns[r].hidden = !this.columns[r].hidden;
-						effected++; 
+						effected++;
 					}
 				}
 			}
@@ -464,9 +460,9 @@
 			var effected = 0;
 			for (var a = 0; a < arguments.length; a++) {
 				for (var r = this.searches.length-1; r >= 0; r--) {
-					if (this.searches[r].field == arguments[a]) { 
-						this.searches[r].hidden = !this.searches[r].hidden; 
-						effected++; 
+					if (this.searches[r].field == arguments[a]) {
+						this.searches[r].hidden = !this.searches[r].hidden;
+						effected++;
 					}
 				}
 			}
@@ -623,7 +619,7 @@
 			var rec2 = this.get(range[1].recid, true);
 			var col1 = range[0].column;
 			var col2 = range[1].column;
-			
+
 			var res = [];
 			if (col1 == col2) { // one row
 				for (var r = rec1; r <= rec2; r++) {
@@ -672,8 +668,8 @@
 				if (ranges[r].name == 'selection') {
 					if (this.show.selectionBorder === false) continue;
 					var sel = this.getSelection();
-					if (sel.length == 0) { 
-						this.removeRange(ranges[r].name); 
+					if (sel.length == 0) {
+						this.removeRange(ranges[r].name);
 						continue;
 					} else {
 						var first = sel[0];
@@ -688,10 +684,10 @@
 					var td2   = $('#grid_'+ this.name +'_rec_'+ last.recid + ' td[col='+ last.column +']');
 				}
 				if (first) {
-					var rg = { 
-						name: ranges[r].name, 
-						range: [{ recid: first.recid, column: first.column }, { recid: last.recid, column: last.column }], 
-						style: ranges[r].style || '' 
+					var rg = {
+						name: ranges[r].name,
+						range: [{ recid: first.recid, column: first.column }, { recid: last.recid, column: last.column }],
+						style: ranges[r].style || ''
 					};
 					// add range
 					var ind = false;
@@ -699,7 +695,7 @@
 					if (ind !== false) {
 						this.ranges[ind] = rg;
 					} else {
-						this.ranges.push(rg);	
+						this.ranges.push(rg);
 					}
 					added++
 				}
@@ -751,7 +747,7 @@
 			}
 
 			// add resizer events
-			$(this.box).find('#grid_'+ this.name +'_resizer').off('mousedown').on('mousedown', mouseStart);			
+			$(this.box).find('#grid_'+ this.name +'_resizer').off('mousedown').on('mousedown', mouseStart);
 			//$(this.box).find('#grid_'+ this.name +'_resizer').off('selectstart').on('selectstart', function () { return false; }); // fixes chrome cursror bug
 
 			var eventData = { phase: 'before', type: 'selectionExtend', target: obj.name, originalRange: null, newRange: null };
@@ -791,15 +787,15 @@
 				mv.newRange = [{ recid: mv.recid, column: mv.column }, { recid: recid, column: column }];
 				// event before
 				eventData = obj.trigger($.extend(eventData, { originalRange: mv.originalRange, newRange : mv.newRange }));
-				if (eventData.isCancelled === true) { 
+				if (eventData.isCancelled === true) {
 					mv.newRange 		= prevNewRange;
 					eventData.newRange 	= prevNewRange;
-					return; 
+					return;
 				} else {
 					// default behavior
 					obj.removeRange('grid-selection-expand');
-					obj.addRange({ 
-						name	: 'grid-selection-expand', 
+					obj.addRange({
+						name	: 'grid-selection-expand',
 						range	: eventData.newRange,
 						style	: 'background-color: rgba(100,100,100,0.1); border: 2px dotted rgba(100,100,100,0.5);'
 					});
@@ -814,27 +810,29 @@
 				$(document).off('mouseup', mouseStop);
 				// event after
 				obj.trigger($.extend(eventData, { phase: 'after' }));
-			}	
+			}
 
 			return (new Date()).getTime() - time;
 		},
 
 		select: function () {
 			var selected = 0;
+			var sel	= this.last.selection;
 			for (var a = 0; a < arguments.length; a++) {
-				var recid  = typeof arguments[a] == 'object' ? arguments[a].recid : arguments[a];
-				var record = this.get(recid);
-				var index  = this.get(recid, true);
+				var recid	= typeof arguments[a] == 'object' ? arguments[a].recid : arguments[a];
+				var record	= this.get(recid);
+				var index	= this.get(recid, true);
+				var recEl 	= $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(recid));
 				if (record == null) continue;
 				if (this.selectType == 'row') {
-					if (record.selected === true) continue;
+					if (sel.recids.indexOf(recid) >= 0) continue;
 					// event before
 					var eventData = this.trigger({ phase: 'before', type: 'select', target: this.name, recid: recid });
 					if (eventData.isCancelled === true) continue;
 					// default action
-					record.selected = true;
-					$('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(recid)).addClass('w2ui-selected').data('selected', 'yes');
-					$('#grid_'+ this.name +'_cell_'+ index +'_select_check').prop('checked', true);
+					sel.recids.push(recid);
+					recEl.addClass('w2ui-selected').data('selected', 'yes');
+					recEl.find('.w2ui-grid-select-check').prop("checked", true);
 					selected++;
 				} else {
 					var col  = arguments[a].column;
@@ -843,33 +841,33 @@
 						for (var c in this.columns) { if (this.columns[c].hidden) continue; cols.push({ recid: recid, column: parseInt(c) }); }
 						return this.select.apply(this, cols);
 					}
-					var s = record.selectedColumns;
+					var s = sel.columns[recid] || [];
 					if ($.isArray(s) && s.indexOf(col) != -1) continue;
 					// event before
 					var eventData = this.trigger({ phase: 'before', type: 'select', target: this.name, recid: recid, column: col });
 					if (eventData.isCancelled === true) continue;
 					// default action
-					if (!$.isArray(s)) record.selectedColumns = [];
-					record.selected = true;
-					record.selectedColumns.push(col); 
-					record.selectedColumns.sort(function(a, b) { return a-b }); // sort function must be for numerical sort
-					$('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(recid) + ' > td[col='+ col +']').addClass('w2ui-selected');
-					selected++;
-					if (record.selected) {					
-						$('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(recid)).data('selected', 'yes');
-						$('#grid_'+ this.name +'_cell_'+ index +'_select_check').prop('checked', true);
+					if (sel.recids.indexOf(recid) == -1) {
+						sel.recids.push(recid);
+						sel.recids.sort(function(a, b) { return a-b });
 					}
+					s.push(col);
+					s.sort(function(a, b) { return a-b }); // sort function must be for numerical sort
+					recEl.find(' > td[col='+ col +']').addClass('w2ui-selected');
+					selected++;
+					recEl.data('selected', 'yes');
+					recEl.find('.w2ui-grid-select-check').prop("checked", true);
+					// save back to selection object
+					sel.columns[recid] = s;
 				}
 				// event after
 				this.trigger($.extend(eventData, { phase: 'after' }));
-			} 
+			}
 			// all selected?
-			$('#grid_'+ this.name +'_check_all').prop('checked', true);
-			if ($('#grid_'+ this.name +'_records').find('.grid_select_check[type=checkbox]').length != 0 &&
-					$('#grid_'+ this.name +'_records').find('.grid_select_check[type=checkbox]').length == $('#grid_'+ this.name +'_records').find('.grid_select_check[type=checkbox]:checked').length) {
+			if (this.last.selection.recids.length == this.records.length) {
 				$('#grid_'+ this.name +'_check_all').prop('checked', true);
 			} else {
-				$('#grid_'+ this.name +'_check_all').prop("checked", false);
+				$('#grid_'+ this.name +'_check_all').prop('checked', false);
 			}
 			this.status();
 			this.addRange('selection');
@@ -878,22 +876,23 @@
 
 		unselect: function () {
 			var unselected = 0;
+			var sel = this.last.selection;
 			for (var a = 0; a < arguments.length; a++) {
-				var recid  = typeof arguments[a] == 'object' ? arguments[a].recid : arguments[a];
-				var record = this.get(recid);
-				var index  = this.get(record.recid, true);
+				var recid	= typeof arguments[a] == 'object' ? arguments[a].recid : arguments[a];
+				var record	= this.get(recid);
+				var index	= this.get(record.recid, true);
+				var recEl 	= $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(recid));
 				if (record == null) continue;
 				if (this.selectType == 'row') {
-					if (record.selected !== true) continue;
+					if (sel.recids.indexOf(recid) == -1) continue;
 					// event before
 					var eventData = this.trigger({ phase: 'before', type: 'unselect', target: this.name, recid: recid });
 					if (eventData.isCancelled === true) continue;
 					// default action
-					record.selected = false
-					var el = $('#grid_'+this.name +'_rec_'+ w2utils.escapeId(record.recid));
-					el.removeClass('w2ui-selected').removeData('selected');
-					if (el.length != 0) el[0].style.cssText = 'height: '+ this.recordHeight +'px; ' + el.attr('custom_style');
-					$('#grid_'+ this.name +'_cell_'+ index +'_select_check').prop("checked", false);
+					sel.recids.splice(sel.recids.indexOf(recid), 1);
+					recEl.removeClass('w2ui-selected').removeData('selected');
+					if (recEl.length != 0) recEl[0].style.cssText = 'height: '+ this.recordHeight +'px; ' + recEl.attr('custom_style');
+					recEl.find('.w2ui-grid-select-check').prop("checked", false);
 					unselected++;
 				} else {
 					var col  = arguments[a].column;
@@ -902,7 +901,7 @@
 						for (var c in this.columns) { if (this.columns[c].hidden) continue; cols.push({ recid: recid, column: parseInt(c) }); }
 						return this.unselect.apply(this, cols);
 					}
-					var s = record.selectedColumns;
+					var s = sel.columns[recid];
 					if (!$.isArray(s) || s.indexOf(col) == -1) continue;
 					// event before
 					var eventData = this.trigger({ phase: 'before', type: 'unselect', target: this.name, recid: recid, column: col });
@@ -912,21 +911,20 @@
 					$('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(recid) + ' > td[col='+ col +']').removeClass('w2ui-selected');
 					unselected++;
 					if (s.length == 0) {
-						record.selected = false;
-						$('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(recid)).removeData('selected');
-						$('#grid_'+ this.name +'_cell_'+ index +'_select_check').prop('checked', false);
+						delete sel.columns[recid];
+						sel.recids.splice(sel.recids.indexOf(recid), 1);
+						recEl.removeData('selected');
+						recEl.find('.w2ui-grid-select-check').prop("checked", false);
 					}
 				}
 				// event after
 				this.trigger($.extend(eventData, { phase: 'after' }));
 			}
 			// all selected?
-			$('#grid_'+ this.name +'_check_all').prop('checked', true);
-			if ($('#grid_'+ this.name +'_records').find('.grid_select_check[type=checkbox]').length != 0 &&
-					$('#grid_'+ this.name +'_records').find('.grid_select_check[type=checkbox]').length == $('#grid_'+ this.name +'_records').find('.grid_select_check[type=checkbox]:checked').length) {
+			if (sel.recids.length == this.records.length) {
 				$('#grid_'+ this.name +'_check_all').prop('checked', true);
 			} else {
-				$('#grid_'+ this.name +'_check_all').prop("checked", false);
+				$('#grid_'+ this.name +'_check_all').prop('checked', false);
 			}
 			// show number of selected
 			this.status();
@@ -940,34 +938,26 @@
 			var eventData = this.trigger({ phase: 'before', type: 'select', target: this.name, all: true });
 			if (eventData.isCancelled === true) return;
 			// default action
+			var url	 = (typeof this.url != 'object' ? this.url : this.url.get);
+			var sel  = this.last.selection;
 			var cols = [];
 			for (var c in this.columns) cols.push(parseInt(c));
-			var url = (typeof this.url != 'object' ? this.url : this.url.get);
-			if (!url) {
-				if (this.searchData.length == 0) { 
-					// not searched
-					this.set({ selected: true });
-					if (this.selectType == 'row') {
-						this.set({ selected: true });
-					} else {
-						this.set({ selected: true, selectedColumns: cols.slice() }); // .slice makes copy of the array
-					}
-				} else { 
-					// local search applied
-					for (var i=0; i<this.last.searchIds.length; i++) {
-						this.records[this.last.searchIds[i]].selected = true;
-						if (this.selectType != 'row') this.records[this.last.searchIds[i]].selectedColumns = cols.slice();
-					}
-					this.refresh();
+			// if local data source and searched	
+			if (!url && this.searchData.length !== 0) {
+				// local search applied
+				for (var i=0; i<this.last.searchIds.length; i++) {
+					sel.recids.push(this.records[r].recid);
+					if (this.selectType != 'row') sel.columns[this.records[r].recid] = cols.slice(); // .slice makes copy of the array
 				}
-			} else { // remote data source
-				if (this.selectType == 'row') {
-					this.set({ selected: true });
-				} else {
-					this.set({ selected: true, selectedColumns: cols.slice() });
+			} else {
+				sel.recids = [];
+				for (var r in this.records) {
+					sel.recids.push(this.records[r].recid);
+					if (this.selectType != 'row') sel.columns[this.records[r].recid] = cols.slice(); // .slice makes copy of the array
 				}
-				this.refresh();
 			}
+			this.refresh();
+			// enable/disable toolbar buttons
 			var sel = this.getSelection();
 			if (sel.length == 1) this.toolbar.enable('edit'); else this.toolbar.disable('edit');
 			if (sel.length >= 1) this.toolbar.enable('delete'); else this.toolbar.disable('delete');
@@ -981,46 +971,41 @@
 			var eventData = this.trigger({ phase: 'before', type: 'unselect', target: this.name, all: true });
 			if (eventData.isCancelled === true) return;
 			// default action
-			this.last.selected = [];
-			for (var i in this.records) {
-				var rec = this.records[i];
-				if (rec.selected === true) {
-					rec.selected = false;
-					var tmp = $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(rec.recid));
-					tmp.removeClass('w2ui-selected').removeData('selected');
-					$('#grid_'+ this.name +'_cell_'+ i +'_select_check').prop("checked", false);
-					if (this.selectType != 'row') {
-						var cols = rec.selectedColumns;
-						for (var c in cols) tmp.find(' > td[col='+ cols[c] +']').removeClass('w2ui-selected');
-						rec.selectedColumns = [];
-					}
-				}
+			var sel = this.last.selection;
+			for (var s in sel.recids) {
+				var recid = sel.recids[s];
+				var recEl = $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(recid));
+				recEl.removeClass('w2ui-selected').removeData('selected');
+				recEl.find('.w2ui-grid-select-check').prop("checked", false);
+				// for not rows
+				if (this.selectType != 'row') {
+					var cols = sel.columns[recid];
+					for (var c in cols) recEl.find(' > td[col='+ cols[c] +']').removeClass('w2ui-selected');
+				}				
 			}
+			sel.recids 	= [];
+			sel.columns = {};
 			this.toolbar.disable('edit', 'delete');
 			this.removeRange('selection');
+			$('#grid_'+ this.name +'_check_all').prop('checked', false);
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
 		},
 
 		getSelection: function (returnIndex) {
+			var ret = [];
+			var sel = this.last.selection;
+			//sel.clean();
 			if (this.selectType == 'row') {
-				var sel = this.find({ selected: true }, true);
-				var ret = [];
-				for (var s in sel) {
-					if (returnIndex === true) {
-						ret.push(sel[s]);
-					} else {
-						ret.push(this.records[sel[s]].recid);
-					}
+				for (var s in sel.recids) {
+					if (returnIndex !== true) ret.push(sel.recids[s]); else ret.push(this.get(sel.recids[s], true));
 				}
 				return ret;
 			} else {
-				var sel = this.find({ selected: true }, true);
-				var ret = [];
-				for (var s in sel) {
-					var rec = this.records[sel[s]];
-					for (var c in rec.selectedColumns) { 
-						ret.push({ recid: rec.recid, index: parseInt(sel[s]), column: rec.selectedColumns[c] });
+				for (var s in sel.recids) {
+					var cols = sel.columns[sel.recids[s]];
+					for (var c in cols) {
+						ret.push({ recid: sel.recids[s], index: this.get(sel.recids[s], true), column: cols[c] });
 					}
 				}
 				return ret;
@@ -1104,7 +1089,7 @@
 									};
 									searchData.push(tmp);
 								}
-								// range in global search box 
+								// range in global search box
 								if (search.type == 'int' && String(value).indexOf('-') != -1) {
 									var t = String(value).split('-');
 									var tmp = {
@@ -1116,7 +1101,7 @@
 									searchData.push(tmp);
 								}
 							}
-						} else { 
+						} else {
 							// no search fields, loop thru columns
 							for (var c in this.columns) {
 								var tmp = {
@@ -1193,9 +1178,9 @@
 			this.last.search = last_search;
 			this.last.multi  = last_multi;
 			this.last.logic  = last_logic;
-			this.last.scrollTop		= 0;
-			this.last.scrollLeft	= 0;
-			this.last.selected		= [];
+			this.last.scrollTop			= 0;
+			this.last.scrollLeft		= 0;
+			this.last.selection.recids	= [];
 			// -- clear all search field
 			this.searchClose();
 			this.set({ expanded: false });
@@ -1296,12 +1281,13 @@
 					this.last.caption 	= w2utils.lang('All Fields');
 				}
 			}
-			this.last.multi			= false;
-			this.last.xhr_offset 	= 0;
+			this.last.multi				= false;
+			this.last.xhr_offset 		= 0;
 			// reset scrolling position
-			this.last.scrollTop		= 0;
-			this.last.scrollLeft	= 0;
-			this.last.selected		= [];
+			this.last.scrollTop			= 0;
+			this.last.scrollLeft		= 0;
+			this.last.selection.recids	= [];
+			this.last.selection.columns	= {};
 			// -- clear all search field
 			this.searchClose();
 			// apply search
@@ -1326,18 +1312,19 @@
 
 		reset: function (noRefresh) {
 			// reset last remembered state
-			this.offset				= 0;
-			this.last.scrollTop		= 0;
-			this.last.scrollLeft	= 0;
-			this.last.selected		= [];
-			this.last.range_start	= null;
-			this.last.range_end		= null;
-			this.last.xhr_offset	= 0;
+			this.offset					= 0;
+			this.last.scrollTop			= 0;
+			this.last.scrollLeft		= 0;
+			this.last.selection.recids	= [];
+			this.last.selection.columns	= {};
+			this.last.range_start		= null;
+			this.last.range_end			= null;
+			this.last.xhr_offset		= 0;
 			this.searchReset(noRefresh);
 			// initial sort
 			if (this.last.sortData != null ) this.sortData	 = this.last.sortData;
 			// select none without refresh
-			this.set({ selected: false, expanded: false }, true);
+			this.set({ expanded: false }, true);
 			// refresh
 			if (!noRefresh) this.refresh();
 		},
@@ -1397,7 +1384,6 @@
 			params['name'] 	 		= this.name;
 			params['limit']  		= this.limit;
 			params['offset'] 		= parseInt(this.offset) + this.last.xhr_offset;
-			params['selected'] 		= this.getSelection();
 			params['search']  		= this.searchData;
 			params['search-logic'] 	= this.last.logic;
 			params['sort'] 	  		= (this.sortData.length != 0 ? this.sortData : '');
@@ -1413,7 +1399,16 @@
 			}
 			// call server to get data
 			var obj = this;
-			this.lock(this.msgRefresh, true);
+			if (this.last.xhr_offset == 0) {
+				this.lock(this.msgRefresh, true);
+			} else {
+				var more = $('#grid_'+ this.name +'_rec_more');
+				if (this.autoLoad === true) {
+					more.show().find('td').html('<div><div style="width: 20px; height: 20px;" class="w2ui-spinner"></div></div>');
+				} else {
+					more.find('td').html('<div>'+ w2utils.lang('Load') + ' ' + obj.limit + ' ' + w2utils.lang('More') + '...</div>');
+				}
+			}
 			if (this.last.xhr) try { this.last.xhr.abort(); } catch (e) {};
 			var xhr_type = 'GET';
 			var url = (typeof eventData.url != 'object' ? eventData.url : eventData.url.get);
@@ -1430,7 +1425,7 @@
 			this.last.xhr_start  = (new Date()).getTime();
 			this.last.xhr = $.ajax({
 				type		: xhr_type,
-				url			: url, 
+				url			: url,
 				data		: String($.param(eventData.postData, false)).replace(/%5B/g, '[').replace(/%5D/g, ']'),
 				dataType	: 'text',
 				complete	: function (xhr, status) {
@@ -1556,12 +1551,12 @@
 					if (s == 'recid') continue; // do not allow to change recid
 					try { eval('record.' + s + ' = changed[c][s]'); } catch (e) {}
 					delete record.changed;
-					delete record.changes; 
+					delete record.changes;
 				}
 			}
 			$(this.box).find('.w2ui-editable input').removeClass('changed');
 			this.refresh();
-		},		
+		},
 
 		// ===================================================
 		// --  Action Handlers
@@ -1574,7 +1569,7 @@
 			if (eventData.isCancelled === true) return false;
 			var url = (typeof this.url != 'object' ? this.url : this.url.save);
 			if (url) {
-				this.request('save-records', { 'changed' : eventData.changed }, null, 
+				this.request('save-records', { 'changed' : eventData.changed }, null,
 					function () { // event after
 						obj.trigger($.extend(eventData, { phase: 'after' }));
 					}
@@ -1595,7 +1590,7 @@
 			var edit  = col.editable;
 			if (!rec || !col || !edit) return;
 			// event before
-			var eventData = obj.trigger({ phase: 'before', type: 'editField', target: obj.name, recid: recid, column: column, value: value, 
+			var eventData = obj.trigger({ phase: 'before', type: 'editField', target: obj.name, recid: recid, column: column, value: value,
 				index: index, originalEvent: event });
 			if (eventData.isCancelled === true) return;
 			value = eventData.value;
@@ -1625,8 +1620,8 @@
 				.on('blur', function (event) {
 					if (obj.parseField(rec, col.field) != this.value) {
 						// change event
-						var eventData2 = obj.trigger({ phase: 'before', type: 'change', target: obj.name, input_id: this.id, recid: recid, column: column, 
-							value_new: this.value, value_previous: (rec.changes ? rec.changes[col.field] : obj.parseField(rec, col.field)), 
+						var eventData2 = obj.trigger({ phase: 'before', type: 'change', target: obj.name, input_id: this.id, recid: recid, column: column,
+							value_new: this.value, value_previous: (rec.changes ? rec.changes[col.field] : obj.parseField(rec, col.field)),
 							value_original: obj.parseField(rec, col.field) });
 						if (eventData2.isCancelled === true) {
 							// dont save new value
@@ -1652,13 +1647,13 @@
 							cancel = true;
 							var next = event.shiftKey ? prevCell(column) : nextCell(column);
 							if (next != column) {
-								this.blur();						
-								setTimeout(function () { 
+								this.blur();
+								setTimeout(function () {
 									if (obj.selectType != 'row') {
-										obj.selectNone(); 
+										obj.selectNone();
 										obj.select({ recid: recid, column: next });
 									} else {
-										obj.editField(recid, next, null, event); 
+										obj.editField(recid, next, null, event);
 									}
 								}, 1);
 							}
@@ -1668,14 +1663,14 @@
 							cancel = true;
 							var next = event.shiftKey ? prevRow(index) : nextRow(index);
 							if (next != index) {
-								this.blur();						
-								setTimeout(function () { 
+								this.blur();
+								setTimeout(function () {
 									if (obj.selectType != 'row') {
-										obj.selectNone(); 
-										obj.select({ recid: obj.records[next].recid, column: column }); 
+										obj.selectNone();
+										obj.select({ recid: obj.records[next].recid, column: column });
 									} else {
 										obj.editField(obj.records[next].recid, column, null, event);
-									}										
+									}
 								}, 1);
 							}
 							break;
@@ -1684,14 +1679,14 @@
 							cancel = true;
 							var next = prevRow(index);
 							if (next != index) {
-								this.blur();						
-								setTimeout(function () { 
+								this.blur();
+								setTimeout(function () {
 									if (obj.selectType != 'row') {
-										obj.selectNone(); 
-										obj.select({ recid: obj.records[next].recid, column: column }); 
+										obj.selectNone();
+										obj.select({ recid: obj.records[next].recid, column: column });
 									} else {
 										obj.editField(obj.records[next].recid, column, null, event);
-									}										
+									}
 								}, 1);
 							}
 							break;
@@ -1700,14 +1695,14 @@
 							cancel = true;
 							var next = nextRow(index);
 							if (next != index) {
-								this.blur();						
-								setTimeout(function () { 
+								this.blur();
+								setTimeout(function () {
 									if (obj.selectType != 'row') {
-										obj.selectNone(); 
-										obj.select({ recid: obj.records[next].recid, column: column }); 
+										obj.selectNone();
+										obj.select({ recid: obj.records[next].recid, column: column });
 									} else {
 										obj.editField(obj.records[next].recid, column, null, event);
-									}										
+									}
 								}, 1);
 							}
 							break;
@@ -1746,7 +1741,7 @@
 				});
 			// unselect
 			if (typeof value == 'undefined' || value == null) {
-				el.find('input').focus(); 
+				el.find('input').focus();
 			} else {
 				el.find('input').val('').focus().val(value);
 			}
@@ -1765,7 +1760,7 @@
 			if (recs.length == 0) return;
 			if (this.msgDelete != '' && !force) {
 				w2confirm(obj.msgDelete, w2utils.lang('Delete Confirmation'), function (result) {
-					if (result == 'Yes') w2ui[obj.name].delete(true); 
+					if (result == 'Yes') w2ui[obj.name].delete(true);
 				});
 				return;
 			}
@@ -1844,7 +1839,7 @@
 			obj.last.sel_col   = column;
 			obj.last.sel_recid = recid;
 			obj.last.sel_type  = 'click';
-			// multi select with shif key 
+			// multi select with shif key
 			if (event.shiftKey && sel.length > 0) {
 				if (sel[0].recid) {
 					var start = this.get(sel[0].recid, true);
@@ -1875,33 +1870,27 @@
 				}
 				this.select.apply(this, sel_add);
 			} else {
+				var last = this.last.selection;
+				var flag = (last.recids.indexOf(record.recid) != -1 ? true : false);
 				// clear other if necessary
 				if (((!event.ctrlKey && !event.shiftKey && !event.metaKey) || !this.multiSelect) && !this.showSelectColumn) {
-					var flag = record.selected;
-					if (this.selectType != 'row' && $.inArray(column, record.selectedColumns) == -1) flag = false;
+					if (this.selectType != 'row' && $.inArray(column, last.columns[record.recid]) == -1) flag = false;
 					if (sel.length > 300) this.selectNone(); else this.unselect.apply(this, sel);
 					if (flag === true) {
 						this.unselect({ recid: recid, column: column });
-						//sel = [];
 					} else {
 						this.select({ recid: recid, column: column });
-						//sel = [{ recid: recid, column: [column] }];
 					}
 				} else {
-					var flag = record.selected;
-					if (this.selectType != 'row' && $.inArray(column, record.selectedColumns) == -1) flag = false;
+					if (this.selectType != 'row' && $.inArray(column, last.columns[recid]) == -1) flag = false;
 					if (flag === true) {
 						this.unselect({ recid: recid, column: column });
-						//sel.splice($.inArray(record.recid, sel), 1);
 					} else {
 						this.select({ recid: record.recid, column: column });
-						//sel.push(record.recid);
 					}
-					setTimeout(function () { if (window.getSelection) window.getSelection().removeAllRanges(); }, 10);
 				}
 			}
 			this.status();
-			obj.last.selected = this.getSelection();
 			obj.initResize();
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
@@ -1925,9 +1914,13 @@
 			var eventData = obj.trigger({ phase: 'before', type: 'keydown', target: obj.name, originalEvent: event });
 			if (eventData.isCancelled === true) return false;
 			// default behavior
-			var sel 	= obj.getSelection();
-			if (sel.length == 0) return;
 			var records = $('#grid_'+ obj.name +'_records');
+			var sel 	= obj.getSelection();
+			if (sel.length == 0) {
+				var ind = Math.floor((records[0].scrollTop + (records.height() / 2.1)) / obj.recordHeight);
+				obj.select({ recid: obj.records[ind].recid, column: 0});
+				sel = obj.getSelection();
+			}
 			var recid	= sel[0];
 			var columns = [];
 			var recid2  = sel[sel.length-1];
@@ -1968,13 +1961,6 @@
 					cancel = true;
 					break;
 
-				case 13: // enter
-				case 32: // spacebar
-					if (columns.length == 0) columns.push(0);
-					obj.editField(recid, columns[0], null, event);
-					cancel = true;
-					break;
-
 				case 65: // cmd + A
 					if (!event.metaKey && !event.ctrlKey) break;
 					obj.selectAll();
@@ -1992,10 +1978,10 @@
 						if (recEL.length <= 0 || obj.show.expandColumn !== true) break;
 						obj.toggle(recid, event);
 						cancel = true;
-					} else { // same as spacebar
+					} else {
 						if (columns.length == 0) columns.push(0);
 						obj.editField(recid, columns[0], null, event);
-						cancel = true;						
+						cancel = true;
 					}
 					break;
 
@@ -2220,9 +2206,9 @@
 					if (event.ctrlKey || event.metaKey) {
 						$('body').append('<textarea id="_tmp_copy_data" style="position: absolute; top: -100px; height: 1px;"></textarea>');
 						$('#_tmp_copy_data').focus();
-						setTimeout(function () { 
+						setTimeout(function () {
 							obj.paste($('#_tmp_copy_data').val());
-							$('#_tmp_copy_data').remove(); 
+							$('#_tmp_copy_data').remove();
 						}, 50); // need timer to allow paste
 					}
 					break;
@@ -2240,7 +2226,7 @@
 					}
 					break;
 			}
-			var tmp = [187, 189]; // =-
+			var tmp = [187, 189, 32]; // =-spacebar
 			for (var i=48; i<=90; i++) tmp.push(i); // 0-9,a-z,A-Z
 			if (tmp.indexOf(event.keyCode) != -1 && !event.ctrlKey && !event.metaKey && !cancel) {
 				if (columns.length == 0) columns.push(0);
@@ -2249,7 +2235,7 @@
 				if (event.keyCode == 189) tmp = '-';
 				if (!event.shiftKey) tmp = tmp.toLowerCase();
 				obj.editField(recid, columns[0], tmp, event);
-				cancel = true;				
+				cancel = true;
 			}
 			if (cancel) { // cancel default behaviour
 				if (event.preventDefault) event.preventDefault();
@@ -2340,7 +2326,7 @@
 			if (records.length == 0) return;
 			// if all records in view
 			var len = this.last.searchIds.length;
-			if (records.height() > this.recordHeight * (len > 0 ? len : this.records.length)) return;			
+			if (records.height() > this.recordHeight * (len > 0 ? len : this.records.length)) return;
 			if (len > 0) ind = this.last.searchIds.indexOf(ind); // if seach is applied
 			// scroll to correct one
 			var t1 = Math.floor(records[0].scrollTop / this.recordHeight);
@@ -2351,7 +2337,7 @@
 		},
 
 		dblClick: function (recid, event) {
-			if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
+			//if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
 			// find columns
 			var column = null;
 			if (typeof recid == 'object') {
@@ -2375,7 +2361,6 @@
 				this.editField(recid, column, null, event);
 			} else {
 				this.select({ recid: recid, column: column });
-				this.last.selected	 = this.getSelection();
 			}
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
@@ -2406,7 +2391,7 @@
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'expand', target: this.name, recid: recid,
 				box_id: 'grid_'+ this.name +'_rec_'+ id +'_expanded', ready: ready });
-			if (eventData.isCancelled === true) { 	
+			if (eventData.isCancelled === true) {
 				$('#grid_'+ this.name +'_rec_'+ id +'_expanded_row').remove();
 				return false;
 			}
@@ -2439,7 +2424,7 @@
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'collapse', target: this.name, recid: recid,
 				box_id: 'grid_'+ this.name +'_rec_'+ id +'_expanded' });
-			if (eventData.isCancelled === true) return false; 
+			if (eventData.isCancelled === true) return false;
 			// default action
 			$('#grid_'+ this.name +'_rec_'+ id).removeAttr('expanded').removeClass('w2ui-expanded');
 			$('#grid_'+ this.name +'_rec_'+ id +'_expanded').css('opacity', 0);
@@ -2589,7 +2574,7 @@
 			this.select.apply(this, newSel);
 			this.refresh();
 			// event after
-			this.trigger($.extend(eventData, { phase: 'after' }));			
+			this.trigger($.extend(eventData, { phase: 'after' }));
 		},
 
 		// ==================================================
@@ -2598,7 +2583,7 @@
 		resize: function () {
 			var obj  = this;
 			var time = (new Date()).getTime();
-			if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
+			//if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
 			// make sure the box is right
 			if (!this.box || $(this.box).attr('name') != this.name) return;
 			// determine new width and height
@@ -2621,6 +2606,25 @@
 			return (new Date()).getTime() - time;
 		},
 
+		refreshCell: function (recid, field) {
+			var index	= this.get(recid, true);
+			var cIndex	= this.getColumn(field, true);
+			$('#grid_'+ this.name + '_rec_'+ recid +' [col='+ cIndex +']').html(this.getCellHTML(index, cIndex));
+		},
+
+		refreshRow: function (recid) {
+			var tr = $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(recid));
+			if (tr.length != 0) {
+				var ind  = this.get(recid, true);
+				var line = tr.attr('line');
+				// if it is searched, find index in search array
+				var url = (typeof this.url != 'object' ? this.url : this.url.get);
+				if (this.searchData.length > 0 && !url) for (var s in this.last.searchIds) if (this.last.searchIds[s] == ind) ind = s;
+				$(tr).replaceWith(this.getRecordHTML(ind, line));
+			}
+
+		},
+
 		refresh: function () {
 			var obj  = this;
 			var time = (new Date()).getTime();
@@ -2629,7 +2633,7 @@
 				this.total = this.records.length;
 				this.buffered = this.total;
 			}
-			if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
+			//if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
 			this.toolbar.disable('edit', 'delete');
 			if (!this.box) return;
 			// event before
@@ -2675,7 +2679,7 @@
 			if (this.last.multi) {
 				searchEl.attr('placeholder', '[' + w2utils.lang('Multiple Fields') + ']');
 			} else {
-				searchEl.attr('placeholder', this.last.caption);				
+				searchEl.attr('placeholder', this.last.caption);
 			}
 
 			// focus search if last searched
@@ -2724,12 +2728,6 @@
 			} else {
 				$('#grid_'+ this.name +'_footer').hide();
 			}
-			// select last selected record
-			if (this.last.selected.length > 0) for (var s in this.last.selected) {
-				if (this.get(this.last.selected[s]) != null) {
-					this.select(this.get(this.last.selected[s]).recid);
-				}
-			}
 			// show/hide clear search link
  			if (this.searchData.length > 0) {
 				$('#grid_'+ this.name +'_searchClear').show();
@@ -2737,12 +2735,10 @@
 				$('#grid_'+ this.name +'_searchClear').hide();
 			}
 			// all selected?
-			$('#grid_'+ this.name +'_check_all').prop('checked', true);
-			if ($('#grid_'+ this.name +'_records').find('.grid_select_check[type=checkbox]').length != 0 &&
-					$('#grid_'+ this.name +'_records').find('.grid_select_check[type=checkbox]').length == $('#grid_'+ this.name +'_records').find('.grid_select_check[type=checkbox]:checked').length) {
+			if (this.last.selection.recids.length == this.records.length) {
 				$('#grid_'+ this.name +'_check_all').prop('checked', true);
 			} else {
-				$('#grid_'+ this.name +'_check_all').prop("checked", false);
+				$('#grid_'+ this.name +'_check_all').prop('checked', false);
 			}
 			// show number of selected
 			this.status();
@@ -2765,7 +2761,7 @@
 		render: function (box) {
 			var obj  = this;
 			var time = (new Date()).getTime();
-			if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
+			//if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
 			if (typeof box != 'undefined' && box != null) {
 				if ($(this.box).find('#grid_'+ this.name +'_body').length > 0) {
 					$(this.box)
@@ -2799,11 +2795,11 @@
 			// init footer
 			$('#grid_'+ this.name +'_footer').html(this.getFooterHTML());
 			// refresh
-			this.refresh(); // show empty grid (need it)
+			if (this.url) this.refresh(); // show empty grid (need it) - should it be only for remote data source
 			this.reload();
 
 			// init mouse events for mouse selection
-			$(this.box).on('mousedown', mouseStart);			
+			$(this.box).on('mousedown', mouseStart);
 			$(this.box).on('selectstart', function () { return false; }); // fixes chrome cursror bug
 
 			// event after
@@ -2836,7 +2832,7 @@
 				obj.last.move.divX = (event.screenX - obj.last.move.x);
 				obj.last.move.divY = (event.screenY - obj.last.move.y);
 				if (Math.abs(obj.last.move.divX) <= 1 && Math.abs(obj.last.move.divY) <= 1) return; // only if moved more then 1px
-				if (obj.last.move.start) {
+				if (obj.last.move.start && obj.last.move.recid) {
 					obj.selectNone();
 					obj.last.move.start = false;
 				}
@@ -2850,7 +2846,7 @@
 				if (ind1 > ind2) { var tmp = ind1; ind1 = ind2; ind2 = tmp; }
 				// check if need to refresh
 				var tmp = 'ind1:'+ ind1 +',ind2;'+ ind2 +',col1:'+ col1 +',col2:'+ col2;
-				if (obj.last.move.range == tmp) return; 
+				if (obj.last.move.range == tmp) return;
 				obj.last.move.range = tmp;
 				for (var i = ind1; i <= ind2; i++) {
 					if (obj.last.searchIds.length > 0 && obj.last.searchIds.indexOf(i) == -1) continue;
@@ -2863,7 +2859,7 @@
 						}
 					} else {
 						newSel.push(obj.records[i].recid);
-					}					
+					}
 				}
 				if (obj.selectType != 'row') {
 					var sel = obj.getSelection();
@@ -2872,7 +2868,7 @@
 					for (var ns in newSel) {
 						var flag = false;
 						for (var s in sel) if (newSel[ns].recid == sel[s].recid && newSel[ns].column == sel[s].column) flag = true;
-						if (!flag) tmp.push({ recid: newSel[ns].recid, column: newSel[ns].column }); 
+						if (!flag) tmp.push({ recid: newSel[ns].recid, column: newSel[ns].column });
 					}
 					obj.select.apply(obj, tmp);
 					// remove items
@@ -2886,7 +2882,7 @@
 				} else {
 					if (obj.multiSelect) {
 						var sel = obj.getSelection();
-						for (var ns in newSel) if (sel.indexOf(newSel[ns]) == -1) obj.select(newSel[ns]); // add more items					
+						for (var ns in newSel) if (sel.indexOf(newSel[ns]) == -1) obj.select(newSel[ns]); // add more items
 						for (var s in sel) if (newSel.indexOf(sel[s]) == -1) obj.unselect(sel[s]); // remove items
 					}
 				}
@@ -2897,7 +2893,7 @@
 				delete obj.last.move;
 				$(document).off('mousemove', mouseMove);
 				$(document).off('mouseup', mouseStop);
-			}			
+			}
 		},
 
 		destroy: function () {
@@ -3022,10 +3018,10 @@
 				// ------ Toolbar Generic buttons
 
 				if (this.show.toolbarReload) {
-					this.toolbar.items.push(this.buttons['reload']);
+					this.toolbar.items.push($.extend(true, {}, this.buttons['reload']));
 				}
 				if (this.show.toolbarColumns) {
-					this.toolbar.items.push(this.buttons['columns']);
+					this.toolbar.items.push($.extend(true, {}, this.buttons['columns']));
 					this.initColumnOnOff();
 				}
 				if (this.show.toolbarReload || this.show.toolbarColumn) {
@@ -3053,26 +3049,26 @@
 						'</div>';
 					this.toolbar.items.push({ type: 'html', id: 'search', html: html });
 					if (this.multiSearch && this.searches.length > 0) {
-						this.toolbar.items.push(this.buttons['search-go']);
+						this.toolbar.items.push($.extend(true, {}, this.buttons['search-go']));
 					}
 				}
 				if (this.show.toolbarSearch && (this.show.toolbarAdd || this.show.toolbarEdit || this.show.toolbarDelete || this.show.toolbarSave)) {
 					this.toolbar.items.push({ type: 'break', id: 'break1' });
 				}
 				if (this.show.toolbarAdd) {
-					this.toolbar.items.push(this.buttons['add']);
+					this.toolbar.items.push($.extend(true, {}, this.buttons['add']));
 				}
 				if (this.show.toolbarEdit) {
-					this.toolbar.items.push(this.buttons['edit']);
+					this.toolbar.items.push($.extend(true, {}, this.buttons['edit']));
 				}
 				if (this.show.toolbarDelete) {
-					this.toolbar.items.push(this.buttons['delete']);
+					this.toolbar.items.push($.extend(true, {}, this.buttons['delete']));
 				}
 				if (this.show.toolbarSave) {
 					if (this.show.toolbarAdd || this.show.toolbarDelete || this.show.toolbarEdit) {
 						this.toolbar.items.push({ type: 'break', id: 'break2' });
 					}
-					this.toolbar.items.push(this.buttons['save']);
+					this.toolbar.items.push($.extend(true, {}, this.buttons['save']));
 				}
 				// add original buttons
 				for (var i in tmp_items) this.toolbar.items.push(tmp_items[i]);
@@ -3091,7 +3087,7 @@
 							if (eventData2.isCancelled === true) return false;
 							var url = (typeof obj.url != 'object' ? obj.url : obj.url.get);
 							if (url) {
-								obj.clear(true); 
+								obj.clear(true);
 							} else {
 								obj.last.scrollTop	= 0;
 								obj.last.scrollLeft	= 0;
@@ -3819,7 +3815,7 @@
 			if (t1 > this.buffered) t1 = this.buffered;
 			if (t2 > this.buffered) t2 = this.buffered;
 			var url = (typeof this.url != 'object' ? this.url : this.url.get);
-			$('#grid_'+ this.name + '_footer .w2ui-footer-right').html(w2utils.formatNumber(this.offset + t1) + '-' + w2utils.formatNumber(this.offset + t2) + ' ' + w2utils.lang('of') + ' ' +	w2utils.formatNumber(this.total) + 
+			$('#grid_'+ this.name + '_footer .w2ui-footer-right').html(w2utils.formatNumber(this.offset + t1) + '-' + w2utils.formatNumber(this.offset + t2) + ' ' + w2utils.lang('of') + ' ' +	w2utils.formatNumber(this.total) +
 					(url ? ' ('+ w2utils.lang('buffered') + ' '+ w2utils.formatNumber(this.buffered) + (this.offset > 0 ? ', skip ' + w2utils.formatNumber(this.offset) : '') + ')' : '')
 			);
 			// only for local data source, else no extra records loaded
@@ -3900,14 +3896,15 @@
 					if (more.css('display') == 'none') {
 						more.show()
 							.on('click', function () {
-								$(this).find('td').html('<div><div style="width: 20px; height: 20px;" class="w2ui-spinner"></div></div>');
 								obj.last.pull_more = true;
 								obj.last.xhr_offset += obj.limit;
 								obj.request('get-records');
+								// show spinner the last
+								$(this).find('td').html('<div><div style="width: 20px; height: 20px;" class="w2ui-spinner"></div></div>');
 							});
 					}
 					if (more.find('td').text().indexOf('Load') == -1) {
-						more.find('td').html('<div>Load '+ obj.limit + ' More...</div>');
+						more.find('td').html('<div>'+ w2utils.lang('Load') + ' ' + obj.limit + ' ' + w2utils.lang('More') + '...</div>');
 					}
 				}
 			}
@@ -3933,10 +3930,11 @@
 
 		getRecordHTML: function (ind, lineNum, summary) {
 			var rec_html = '';
+			var sel = this.last.selection;
 			// first record needs for resize purposes
 			if (ind == -1) {
 				rec_html += '<tr line="0">';
-				if (this.show.lineNumbers) rec_html  += '<td class="w2ui-col-number" style="height: 0px;"></td>';
+				if (this.show.lineNumbers)  rec_html += '<td class="w2ui-col-number" style="height: 0px;"></td>';
 				if (this.show.selectColumn) rec_html += '<td class="w2ui-col-select" style="height: 0px;"></td>';
 				if (this.show.expandColumn) rec_html += '<td class="w2ui-col-expand" style="height: 0px;"></td>';
 				for (var i in this.columns) {
@@ -3965,16 +3963,16 @@
 			if (!record) return '';
 			var id = w2utils.escapeId(record.recid);
 			var isRowSelected = false;
-			if (record.selected && this.selectType == 'row') isRowSelected = true;
+			if (sel.recids.indexOf(record.recid) != -1) isRowSelected = true;
 			// render TR
 			rec_html += '<tr id="grid_'+ this.name +'_rec_'+ record.recid +'" recid="'+ record.recid +'" line="'+ lineNum +'" '+
-				' class="'+ (lineNum % 2 == 0 ? 'w2ui-even' : 'w2ui-odd') + (isRowSelected ? ' w2ui-selected' : '') + (record.expanded === true ? ' w2ui-expanded' : '') + '" ' +
+				' class="'+ (lineNum % 2 == 0 ? 'w2ui-even' : 'w2ui-odd') + (isRowSelected && this.selectType == 'row' ? ' w2ui-selected' : '') + (record.expanded === true ? ' w2ui-expanded' : '') + '" ' +
 				(summary !== true ?
 					(this.isIOS ?
 						'	onclick  = "w2ui[\''+ this.name +'\'].dblClick(\''+ record.recid +'\', event);"'
 						:
 						'	onclick	 = "w2ui[\''+ this.name +'\'].click(\''+ record.recid +'\', event);"'
-					 ) 
+					 )
 					: ''
 				) +
 				' style="height: '+ this.recordHeight +'px; '+ (!isRowSelected && record['style'] ? record['style'] : '') +'" '+
@@ -3991,8 +3989,8 @@
 						'		onclick="if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;">'+
 							(summary !== true ?
 							'	<div>'+
-							'		<input id="grid_'+ this.name +'_cell_'+ ind +'_select_check" class="grid_select_check" type="checkbox" tabIndex="-1"'+
-							'			'+ (record.selected ? 'checked="checked"' : '') +
+							'		<input class="w2ui-grid-select-check" type="checkbox" tabIndex="-1"'+
+							'			'+ (isRowSelected ? 'checked="checked"' : '') +
 							'			onclick="var obj = w2ui[\''+ this.name +'\']; '+
 							'				if (!obj.multiSelect) { obj.selectNone(); }'+
 							'				if (this.checked) obj.select(\''+ record.recid + '\'); else obj.unselect(\''+ record.recid + '\'); '+
@@ -4031,7 +4029,7 @@
 					if ($.inArray(tmp[0], ['date']) != -1) addStyle = 'text-align: right';
 				}
 				var isCellSelected = false;
-				if (record.selected && $.inArray(col_ind, record.selectedColumns) != -1) isCellSelected = true;
+				if (isRowSelected && $.inArray(col_ind, sel.columns[record.recid]) != -1) isCellSelected = true;
 				rec_html += '<td class="w2ui-grid-data'+ (isCellSelected ? ' w2ui-selected' : '') + (isChanged ? ' w2ui-changed' : '') +'" col="'+ col_ind +'" '+
 							'	style="'+ addStyle + ';' + (typeof col.style != 'undefined' ? col.style : '') +'" '+
 										  (typeof col.attr != 'undefined' ? col.attr : '') +'>'+
@@ -4042,18 +4040,6 @@
 			}
 			rec_html += '<td class="w2ui-grid-data-last"></td>';
 			rec_html += '</tr>';
-			// if row is expanded (buggy)
-			// if (record.expanded === true && $('#grid_'+ this.name +'_rec_'+ record.recid +'_expanded_row').length == 0) {
-			// 	var tmp = 1 + (this.show.selectColumn ? 1 : 0);
-			// 	rec_html += 
-			// 		'<tr id="grid_'+ this.name +'_rec_'+ id +'_expanded_row" class="w2ui-expanded-row">'+
-			// 			(this.show.lineNumbers ? '<td class="w2ui-col-number"></td>' : '') +
-			// 		'	<td class="w2ui-grid-data w2ui-expanded1" colspan="'+ tmp +'"><div style="display: none"></div></td>'+
-			// 		'	<td colspan="100" class="w2ui-expanded2">'+
-			// 		'		<div id="grid_'+ this.name +'_rec_'+ record.recid +'_expanded" style="opacity: 0"></div>'+
-			// 		'	</td>'+
-			// 		'</tr>';
-			// }
 			return rec_html;
 		},
 
@@ -4061,7 +4047,7 @@
 			var col  	= this.columns[col_ind];
 			var record 	= (summary !== true ? this.records[ind] : this.summary[ind]);
 			var data 	= this.parseField(record, col.field);
-			var isChanged = record.changed && record.changes[col.field];
+			var isChanged = record.changed && typeof record.changes[col.field] != 'undefined';
 			if (isChanged) data = record.changes[col.field];
 			// various renderers
 			if (data == null || typeof data == 'undefined') data = '';
@@ -4103,7 +4089,7 @@
 						if (typeof col.title == 'function') title = col.title.call(this, record, ind, col_ind);
 						if (typeof col.title == 'string')   title = col.title;
 					}
-					var data = '<div title="'+ title +'">'+ data +'</div>';	
+					var data = '<div title="'+ title +'">'+ data +'</div>';
 				}
 			}
 			if (data == null || typeof data == 'undefined') data = '';
@@ -4139,8 +4125,10 @@
 		},
 
 		lock: function (msg, showSpinner) {
-			var box = $(this.box).find('> div:first-child');
-			setTimeout(function () { w2utils.lock(box, msg, showSpinner); }, 10);
+			var box  = $(this.box).find('> div:first-child');
+			var args = Array.prototype.slice.call(arguments, 0);
+			args.unshift(box);
+			setTimeout(function () { w2utils.lock.apply(window, args); }, 10);
 		},
 
 		unlock: function () {
@@ -4161,7 +4149,7 @@
 			}
 			return val;
 		}
-	}
+	};
 
 	$.extend(w2grid.prototype, w2utils.event);
 	w2obj.grid = w2grid;
