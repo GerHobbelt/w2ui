@@ -1,8 +1,8 @@
 /************************************************************************
 *   Library: Web 2.0 UI for jQuery (using prototypical inheritance)
 *   - Following objects defined
-* 		- w2popup 	- popup widget
-*		- $.w2popup	- jQuery wrapper
+* 		- w2popup	 	- popup widget
+*		- $().w2popup	- jQuery wrapper
 *   - Dependencies: jQuery, w2utils
 * 
 * == NICE TO HAVE ==
@@ -11,17 +11,8 @@
 * 	- transition should include title, body and buttons, not just body
 *	- add lock method() to lock popup content
 *
-* == 1.3 changes ==
-*	- keyboard esc - close
-*	- w2confirm() - enter - yes, esc - no
-*	- added onKeydown event listener
-*	- added callBack to w2alert(msg, title, callBack)
-*	- renamed doKeydown to keydown()
-*	- if there are no rel=, the entire html is taken as body
-*	- options.url is now for load or open methods
-*	- moved all events to w2utils.event
-*	- aded lock() and unlock() functions
-*	- fixed w2alert() and w2confirm to work in already opend popup
+* == 1.4 changes
+*	- deleted getSelection().removeAllRanges() - see https://github.com/vitmalina/w2ui/issues/323
 *
 ************************************************************************/
 
@@ -534,7 +525,9 @@ var w2popup = {};
 		},
 
 		lock: function (msg, showSpinner) {
-			w2utils.lock($('#w2ui-popup'), msg, showSpinner);
+			var args = Array.prototype.slice.call(arguments, 0);
+			args.unshift($('#w2ui-popup'));
+			w2utils.lock.apply(window, args);
 		},
 
 		unlock: function () { 
@@ -573,7 +566,7 @@ var w2popup = {};
 						'-o-transition': '.1s', 
 						'opacity': '0.6'
 					});			
-					if (window.getSelection) window.getSelection().removeAllRanges();
+					// if (window.getSelection) window.getSelection().removeAllRanges();
 				}); 
 				$('#w2ui-lock').on('mouseup', function () {
 					setTimeout(function () {
@@ -585,7 +578,7 @@ var w2popup = {};
 							'opacity': options.opacity
 						});
 					}, 100);
-					if (window.getSelection) window.getSelection().removeAllRanges();
+					// if (window.getSelection) window.getSelection().removeAllRanges();
 				});
 			} else {
 				$('#w2ui-lock').on('mouseup', function () { w2popup.close(); });

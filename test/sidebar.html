@@ -8,10 +8,11 @@
 <script>
 $(function () {
 	$('#sidebar').w2sidebar({
-		name: 'sidebar',
-		img: null,
-		topHTML: '<div style="padding: 10px 5px; border-bottom: 1px solid #aaa;">This is text</div>',
-		bottomHTML: '<div style="padding: 10px 5px; border-top: 1px solid #aaa;">Bottom</div>',
+		name		: 'sidebar',
+		img			: null,
+		topHTML		: '<div style="padding: 10px 5px; border-bottom: 1px solid #aaa;">This is text</div>',
+		bottomHTML	: '<div style="padding: 10px 5px; border-top: 1px solid #aaa;">Bottom</div>',
+		style		: 'border: 1px solid silver',
 		menu: [
 			{ id: 1, text: 'Select Item', icon: 'fa-star' },
 			{ id: 2, text: 'View Item', icon: 'fa-camera' }, 
@@ -20,7 +21,7 @@ $(function () {
 		onMenuClick: function (event) {
 			console.log(event);
 		},
-		onKeyboard: function (event) { console.log('keyboard', event); event.preventDefault(); },
+		//onKeydown: function (event) { console.log('keyboard', event); event.preventDefault(); },
 		nodes: [ 
 			{ id: 'level-1', text: 'Level 1', expanded: true, group: true, 
 			  nodes: [ { id: 'level-1-1', text: 'Level 1.1', img1: 'icon-add', icon: 'fa-star', count: 1, 
@@ -82,6 +83,6 @@ $(function () {
 </script>
 </head>
 <body>
-	<div id="sidebar" style="width: 300px; height: 500px;"></div>
+	<div id="sidebar" style="width: 250px; height: 500px;"></div>
 </body>
 </html>

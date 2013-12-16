@@ -1,50 +1,69 @@
+<!DOCTYPE html>
 <html>
 <head>
-<link rel="stylesheet" type="text/css" media="screen" href="../dist/w2ui.css" /> 
-<script type="text/javascript" src="../libs/jquery/jquery.js"></script>
-<script type="text/javascript" src="../dist/w2ui.js"></script>
-<script type="text/javascript" src="../src/w2grid.js"></script>
-<script type="text/javascript" src="../src/w2form.js"></script>
-<script>
-$(function () {
-  $('#form').w2form({
-    name  : 'myForm',
-    //url   : 'server/post',
-    fields: [{ name: 'xxx', type: 'text'},{ name: 'yyy', type: 'text'}]
-  });
-  w2ui['myForm'].lock(' ');
-  $(document).on('click', '#popup', function(e){
-    $('#myPopup').w2popup('open', {showClose:false});
-  });
-  $(document).on('click', '#OK,#Quit', function(e){
-    $().w2popup('close');
-  });
-  $(document).on('click', '#unlock', function(e){
-    w2ui['myForm'].unlock();
-  });
-});
-</script>
+    <title>W2UI Demo: combo-9</title>
+    <link rel="stylesheet" type="text/css" href="../dist/w2ui.css" />
+    <script src="libs/jquery/jquery.js"></script>
+    <script src="http://underscorejs.org/underscore.js"></script>
+    <script type="text/javascript" src="../dist/w2ui.js"></script>
+    <script type="text/javascript" src="../src/w2utils.js"></script>
+    <script type="text/javascript" src="../src/w2grid.js"></script>
+</head>
 <body>
-<input id="popup" type="button" value="popup" />
 
-<div id="form" style="width:800px;height:600px">
-  <div class="w2ui-page page-0">
-    <div class="w2ui-field">
-      <input name="xxx" type="text" size="50"></input>
-      <input name="yyy" type="text" size="50"></input>
-    </div>
-  </div>
-</div>
+<div id="main" style="width: 100%; height: 400px;"></div>
 
-<div id="myPopup" style="display: none; width: 50%; height: 100%;">
-	<div rel="title">myPopup</div>
-	<div rel="body">
-	  <input id="unlock" type="button" value="unlock" />
-	</div>
-	<div rel="buttons">
-	  <input id="OK" type="button" value="OK" />
-	  <input id="Quit" type="button" value="Abbrechen" />
-	</div>
-</div>
+<script type="text/javascript">
+// widget configuration
+var config = {
+    grid: { 
+        name: 'grid',
+        //url : 'http://w2ui.com/web/pages/demo/infinite/index.php',
+        show: { 
+            footer  : true,
+            toolbar : true,
+            selectColumn: true,
+            lineNumbers: true
+        },
+        columns: [              
+            { field: 'recid', caption: 'ID', size: '50px', sortable: true, searchable: 'int', resizable: true },
+            { field: 'fname', caption: 'First Name', size: '140px', sortable: true, searchable: 'text', resizable: true },
+            { field: 'lname', caption: 'Last Name', size: '140px', sortable: true, searchable: 'text', resizable: true },
+            { field: 'email', caption: 'Email', size: '100%', resizable: true, sortable: true },
+            { field: 'sdate', caption: 'Date', size: '200px', resizable: true, sortable: true },
+        ]
+    }
+}
+var time = (new Date()).getTime();
+
+$(function () {
+    $('#main').w2grid(config.grid);
+    w2ui.grid.lock('Generating Records');
+    setTimeout(function () {
+        generate(1000); // 12000 - which is 12mil max
+    }, 100);
+});
+
+function generate(num) {
+    var fname = ['Vitali', 'Katsia', 'John', 'Peter', 'Sue', 'Olivia', 'Thomas', 'Sergei', 'Alexander', 'Anton', 'Divia'];
+    var lname = ['Peterson', 'Rene', 'Johnson-Petrov', 'Cuban', 'Twist', 'Sidorov', 'Vasiliev', 'Hertz', 'Volkov'];
+    w2ui.grid.records = [];
+    for (var i = 0; i < num * 1000; i++) {
+        w2ui['grid'].records.push({ 
+            recid : (i+1),
+            personid: (i+1),
+            fname: fname[Math.floor(Math.random() * fname.length)], 
+            lname: lname[Math.floor(Math.random() * lname.length)],
+            email: 'vm@gmail.com', sdate: '1/1/2013', manager: '--'
+        });
+    }
+    w2ui.grid.buffered = w2ui.grid.records.length;
+    w2ui.grid.total = w2ui.grid.buffered
+    w2ui.grid.unlock();
+    console.log('Generated records in '+ (((new Date()).getTime() - time) / 1000) +' sec');
+    console.log('Render Time: '+ (w2ui.grid.refresh() / 1000) +' sec');
+}
+</script>
+
 </body>
 </html>

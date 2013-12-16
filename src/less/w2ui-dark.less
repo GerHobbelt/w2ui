@@ -133,6 +133,8 @@
 
 @layout-color: #C0C8D5;
 @layout-background-color: inherit;
+@layout-title-border: 1px solid silver;
+@layout-title-background-color: #F0F0F0;
 @layout-toolbar-background-color: inherit;
 @layout-resizer-background-color: #222;
 @layout-resizer-hover-background-color: #222;
@@ -290,3 +292,22 @@
 @drop-menu-image-color: #516173;
 
 @import "src/w2ui-toolbar.less";
+
+// ******************************************
+// ---- Listview ----
+
+@debug-border: false;
+
+@listview-background-color: #434D64;
+@listview-item-color: @sidebar-node-color;
+@listview-item-selected-color: @sidebar-node-selected-color;
+@listview-item-description-color: gray;
+@listview-item-border-selection-color: #111; // same as @sidebar-node-selected-border-bottom;
+
+@listview-item-selected-linear-gradient-start: @sidebar-node-selected-linear-gradient-start;
+@listview-item-selected-linear-gradient-end: @sidebar-node-selected-linear-gradient-end;
+
+@listview-item-hover-background-color-start: @sidebar-node-hover-background-color-start;
+@listview-item-hover-background-color-end: @sidebar-node-hover-background-color-end;
+
+@import "src/w2ui-listview.less";
