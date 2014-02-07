@@ -10,6 +10,8 @@
 *	- add find() method to find nodes by a specific criteria (I want all nodes for exampe)
 *	- dbl click should be like it is in grid (with timer not HTML dbl click event)
 *	- reorder with grag and drop
+*	- add route property that would navigate to a #route
+*	- node.style is missleading
 *
 * == 1.4 changes
 *	- deleted getSelection().removeAllRanges() - see https://github.com/vitmalina/w2ui/issues/323
@@ -22,7 +24,7 @@
 		this.box			= null;
 		this.sidebar		= null;
 		this.parent			= null;
-		this.nodes			= [];		// Sidebar child nodes
+		this.nodes			= [];	// Sidebar child nodes
 		this.menu			= [];
 		this.selected		= null;	// current selected node (readonly)
 		this.img			= null;
@@ -89,12 +91,13 @@
 			img				: null,
 			icon			: null,
 			nodes			: [],
-			style			: '',
+			style			: '',			// additiona style for subitems
 			selected		: false,
 			expanded		: false,
 			hidden			: false,
 			disabled		: false,
 			group			: false,		// if true, it will build as a group
+			groupShowHide	: false,
 			plus			: false,		// if true, plus will be shown even if there is no sub nodes
 			// events
 			onClick			: null,
@@ -174,8 +177,12 @@
 			for (var a = 0; a < arguments.length; a++) {
 				tmp = this.get(arguments[a]);
 				if (tmp === null) continue;
+				if (this.selected !== null && this.selected.id === tmp.id){
+					this.selected = null;
+				}
 				var ind  = this.get(tmp.parent, arguments[a], true);
 				if (ind === null) continue;
+				if (tmp.parent.nodes[ind].selected)	tmp.sidebar.unselect(tmp.id);
 				tmp.parent.nodes.splice(ind, 1);
 				deleted++;
 			}
@@ -293,6 +300,7 @@
 				.find('.w2ui-icon').addClass('w2ui-icon-selected');
 			new_node.selected = true;
 			this.selected = id;
+			return true;
 		},
 		
 		unselect: function (id) {
@@ -308,60 +316,65 @@
 		
 		toggle: function(id) {
 			var nd = this.get(id);
-			if (nd === null) return;
+			if (nd === null) return false;
 			if (nd.plus) {
 				this.set(id, { plus: false });
 				this.expand(id);
 				this.refresh(id);
 				return;
 			}
-			if (nd.nodes.length === 0) return;
-			if (this.get(id).expanded) this.collapse(id); else this.expand(id);
+			if (nd.nodes.length === 0) return false;
+			if (this.get(id).expanded) return this.collapse(id); else return this.expand(id);
 		},
 
 		collapse: function (id) {
-			var nd = this.get(id);
+			var obj = this;
+			var nd  = this.get(id);
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'collapse', target: id, object: nd });
 			if (eventData.isCancelled === true) return false;
 			// default action
-			$(this.box).find('#node_'+ w2utils.escapeId(id) +'_sub').slideUp('fast');		
+			$(this.box).find('#node_'+ w2utils.escapeId(id) +'_sub').slideUp(200);
 			$(this.box).find('#node_'+ w2utils.escapeId(id) +' .w2ui-node-dots:first-child').html('<div class="w2ui-expand">+</div>');
 			nd.expanded = false;
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
-			this.resize();
+			setTimeout(function () { obj.refresh(id); }, 200);
+			return true;
 		},
 
 		collapseAll: function (parent) {
 			if (typeof parent == 'undefined') parent = this;
 			if (typeof parent == 'string') parent = this.get(parent); 
-			if (parent.nodes === null) return null;
+			if (parent.nodes === null) return false;
 			for (var i=0; i < parent.nodes.length; i++) {
 				if (parent.nodes[i].expanded === true) parent.nodes[i].expanded = false;
 				if (parent.nodes[i].nodes && parent.nodes[i].nodes.length > 0) this.collapseAll(parent.nodes[i]);
 			}
 			this.refresh(parent.id);
+			return true;
 		},		
 	
 		expand: function (id) {
-			var nd = this.get(id);
+			var obj = this;
+			var nd  = this.get(id);
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'expand', target: id, object: nd });	
 			if (eventData.isCancelled === true) return false;
 			// default action
-			$(this.box).find('#node_'+ w2utils.escapeId(id) +'_sub').slideDown('fast');
+			$(this.box).find('#node_'+ w2utils.escapeId(id) +'_sub').slideDown(200);
 			$(this.box).find('#node_'+ w2utils.escapeId(id) +' .w2ui-node-dots:first-child').html('<div class="w2ui-expand">-</div>');
 			nd.expanded = true;
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
-			this.resize();
+			setTimeout(function () { obj.refresh(id); }, 200);
+			return true;
 		},
 		
 		expandAll: function (parent) {
 			if (typeof parent == 'undefined') parent = this;
 			if (typeof parent == 'string') parent = this.get(parent); 
-			if (parent.nodes === null) return null;
+			if (parent.nodes === null) return false;
 			for (var i=0; i < parent.nodes.length; i++) {
 				if (parent.nodes[i].expanded === false) parent.nodes[i].expanded = true;
 				if (parent.nodes[i].nodes && parent.nodes[i].nodes.length > 0) this.collapseAll(parent.nodes[i]);
@@ -371,12 +384,13 @@
 
 		expandParents: function (id) {
 			var node = this.get(id);
-			if (node === null) return;
+			if (node === null) return false;
 			if (node.parent) {
 				node.parent.expanded = true;
 				this.expandParents(node.parent.id);
 			}
 			this.refresh(id);
+			return true;
 		}, 
 
 		click: function (id, event) {
@@ -504,10 +518,10 @@
 			var item	= $(this.box).find('#node_'+ w2utils.escapeId(id));
 			var offset	= item.offset().top - body.offset().top;
 			if (offset + item.height() > body.height()) {
-				body.animate({ 'scrollTop': body.scrollTop() + body.height() / 1.3 });
+				body.animate({ 'scrollTop': body.scrollTop() + body.height() / 1.3 }, 250, 'linear');
 			}
 			if (offset <= 0) {
-				body.animate({ 'scrollTop': body.scrollTop() - body.height() / 1.3 });
+				body.animate({ 'scrollTop': body.scrollTop() - body.height() / 1.3 }, 250, 'linear');
 			}
 		},
 
@@ -544,7 +558,7 @@
 				}
 				// event after
 				obj.trigger($.extend(eventData, { phase: 'after' }));
-			}, 1);	
+			}, 150); // need timer 150 for FF
 		},
 
 		menuClick: function (itemId, index, event) {
@@ -676,11 +690,10 @@
 				if (nd.group) {
 					html = 
 						'<div class="w2ui-node-group"  id="node_'+ nd.id +'"'+
-						'		onclick="w2ui[\''+ obj.name +'\'].toggle(\''+ nd.id +'\'); '+
-						'					var sp=$(this).find(\'span:nth-child(1)\'); if (sp.html() == \''+ w2utils.lang('Hide') +'\') sp.html(\''+ w2utils.lang('Show') +'\'); else sp.html(\''+ w2utils.lang('Hide') +'\');"'+
+						'		onclick="w2ui[\''+ obj.name +'\'].toggle(\''+ nd.id +'\')"'+
 						'		onmouseout="$(this).find(\'span:nth-child(1)\').css(\'color\', \'transparent\')" '+
 						'		onmouseover="$(this).find(\'span:nth-child(1)\').css(\'color\', \'inherit\')">'+
-						'	<span>'+ (!nd.hidden && nd.expanded ? w2utils.lang('Hide') : w2utils.lang('Show')) +'</span>'+
+						(nd.groupShowHide ? '<span>'+ (!nd.hidden && nd.expanded ? w2utils.lang('Hide') : w2utils.lang('Show')) +'</span>' : '<span></span>') +
 						'	<span>'+ nd.text +'</span>'+
 						'</div>'+
 						'<div class="w2ui-node-sub" id="node_'+ nd.id +'_sub" style="'+ nd.style +';'+ (!nd.hidden && nd.expanded ? '' : 'display: none;') +'"></div>';

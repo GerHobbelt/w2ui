@@ -80,8 +80,7 @@ $(function () {
 					{ id: 'grid-21', text: 'Inline Editing', icon: 'fa-table' },
 					{ id: 'grid-22', text: 'Resizable Columns', icon: 'fa-table' },
 					{ id: 'grid-24', text: 'Lock/Unlock Grid', icon: 'fa-table' },
-					// { id: 'grid-23', text: 'Buffered Scroll', icon: 'fa-table' },
-					// { id: 'grid-24', text: 'Infinite Scroll', icon: 'fa-table' },
+					{ id: 'grid-25', text: 'Re-Order Columns', icon: 'fa-table' },
 					//{ id: 'grid-26', text: 'Re-Order records', icon: 'fa-table' },
 					//{ id: 'grid-27', text: 'Locked Columns', icon: 'fa-table' }
 				]
@@ -111,6 +110,7 @@ $(function () {
 				nodes: [
 					{ id: 'listview-1', text: 'Simple ListView', icon: 'fa-folder-close-alt' },
 					{ id: 'listview-2', text: 'Different view types', icon: 'fa-folder-close-alt' },
+					{ id: 'listview-5', text: 'Table view type', icon: 'fa-folder-close-alt' },
 					{ id: 'listview-3', text: 'Selecting items', icon: 'fa-folder-close-alt' },
 					{ id: 'listview-4', text: 'Add/Remove items', icon: 'fa-folder-close-alt' }
 				]

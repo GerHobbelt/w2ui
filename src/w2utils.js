@@ -24,9 +24,18 @@ var w2obj = w2obj || {}; // expose object to be able to overwrite default functi
 * 	- write and article how to replace certain framework functions
 *	- format date and time is buggy
 *	- onComplete should pass widget as context (this)
+*	- add maxHeight for the w2menu
+*	- user localization from another lib (make it generic), https://github.com/jquery/globalize#readme
+*	- hidden and disabled in menus
 *
 * == 1.4 changes
 *	- lock(box, options) || lock(box, msg, spinner)
+* 	- updated age() date(), formatDate(), formatTime() - input format either '2013/12/21 19:03:59 PST' or unix timestamp
+*	- formatNumer(num, groupSymbol) - added new param
+*	- improved localization support (currency prefix, suffix, numbger group symbol)
+*	- improoved overlays (better positioning, refresh, etc.)
+*	- multiple overlay at the same time (if it has name)
+*	- overlay options.css removed, I have added options.style 
 *
 ************************************************/
 
@@ -37,10 +46,10 @@ var w2utils = (function () {
 			"locale"		: "en-us",
 			"date_format"	: "m/d/yyyy",
 			"date_display"	: "Mon d, yyyy",
-			"time_format"	: "hh:mi pm",
-			"currency"		: "^[\$\€\£\¥]?[-]?[0-9]*[\.]?[0-9]+$",
-			"currencySymbol": "$",
-			"float"			: "^[-]?[0-9]*[\.]?[0-9]+$",
+			"time_format"	: "h12",
+			"currencyPrefix": "$",
+			"currencySuffix": "",
+			"groupSymbol"	: ",",
 			"shortmonths"	: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
 			"fullmonths"	: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
 			"shortdays"		: ["M", "T", "W", "T", "F", "S", "S"],
@@ -79,27 +88,31 @@ var w2utils = (function () {
 	return obj;
 	
 	function isInt (val) {
-		var re =  /^[-]?[0-9]+$/;
+		var re = /^[-+]?[0-9]+$/;
 		return re.test(val);		
 	}
 		
 	function isFloat (val) {
-		var re =  new RegExp(w2utils.settings["float"]);
-		return re.test(val);		
+		return typeof val == 'number' || (typeof val == 'string' && val != '' && Number(val) + '' != 'NaN') ? true : false;
 	}
 
 	function isMoney (val) {
-		var re =  new RegExp(w2utils.settings.currency);
+		var se = w2utils.settings;
+		var re = new RegExp('^'+ (se.currencyPrefix ? '\\' + se.currencyPrefix + '?' : '') +'[-+]?[0-9]*[\.]?[0-9]+'+ (se.currencySuffix ? '\\' + se.currencySuffix + '?' : '') +'$', 'i');
+		if (typeof val == 'string') {
+			val = val.replace(new RegExp(se.groupSymbol, 'g'), '');
+		}
+		if (typeof val == 'object' || val == '') return false;
 		return re.test(val);		
 	}
 		
 	function isHex (val) {
-		var re =  /^[a-fA-F0-9]+$/;
+		var re = /^[a-fA-F0-9]+$/;
 		return re.test(val);		
 	}
 	
 	function isAlphaNumeric (val) {
-		var re =  /^[a-zA-Z0-9_-]+$/;
+		var re = /^[a-zA-Z0-9_-]+$/;
 		return re.test(val);		
 	}
 	
@@ -111,6 +124,15 @@ var w2utils = (function () {
 	function isDate (val, format, retDate) {
 		if (!val) return false;
 		if (!format) format = w2utils.settings.date_format;
+		// convert month formats
+		if (RegExp('mon', 'ig').test(format)) {
+			format = format.replace(/month/ig, 'm').replace(/mon/ig, 'm').replace(/dd/ig, 'd').replace(/[, ]/ig, '/').replace(/\/\//g, '/').toLowerCase();
+			val	= val.replace(/[, ]/ig, '/').replace(/\/\//g, '/').toLowerCase();
+			for (var m in w2utils.settings.fullmonths) {
+				var t = w2utils.settings.fullmonths[m];
+				val = val.replace(RegExp(t, 'ig'), (parseInt(m) + 1)).replace(RegExp(t.substr(0, 3), 'ig'), (parseInt(m) + 1));
+			}
+		}
 		// format date
 		var tmp  = val.replace(/-/g, '/').replace(/\./g, '/').toLowerCase().split('/');
 		var tmp2 = format.replace(/-/g, '/').replace(/\./g, '/').toLowerCase();
@@ -124,6 +146,14 @@ var w2utils = (function () {
 		if (tmp2 == 'yyyy/d/m')   { month = tmp[2]; day = tmp[1]; year = tmp[0]; } 
 		if (tmp2 == 'yyyy/mm/dd') { month = tmp[1]; day = tmp[2]; year = tmp[0]; } 
 		if (tmp2 == 'yyyy/m/d')   { month = tmp[1]; day = tmp[2]; year = tmp[0]; } 
+		if (tmp2 == 'mm/dd/yy')   { month = tmp[0]; day = tmp[1]; year = tmp[2]; }
+		if (tmp2 == 'm/d/yy')     { month = tmp[0]; day = tmp[1]; year = parseInt(tmp[2]) + 1900; }
+		if (tmp2 == 'dd/mm/yy')   { month = tmp[1]; day = tmp[0]; year = parseInt(tmp[2]) + 1900; }
+		if (tmp2 == 'd/m/yy')     { month = tmp[1]; day = tmp[0]; year = parseInt(tmp[2]) + 1900; }
+		if (tmp2 == 'yy/dd/mm')   { month = tmp[2]; day = tmp[1]; year = parseInt(tmp[0]) + 1900; } 
+		if (tmp2 == 'yy/d/m')     { month = tmp[2]; day = tmp[1]; year = parseInt(tmp[0]) + 1900; } 
+		if (tmp2 == 'yy/mm/dd')   { month = tmp[1]; day = tmp[2]; year = parseInt(tmp[0]) + 1900; } 
+		if (tmp2 == 'yy/m/d')     { month = tmp[1]; day = tmp[2]; year = parseInt(tmp[0]) + 1900; } 
 		dt = new Date(month + '/' + day + '/' + year);
 		// do checks
 		if (typeof month == 'undefined') return false;
@@ -149,17 +179,11 @@ var w2utils = (function () {
 		return true;
 	}
 
-	function age (timeStr) {
-		if (timeStr == '' || typeof timeStr == 'undefined' || timeStr == null) return '';
-		if (w2utils.isInt(timeStr)) timeStr = Number(timeStr); // for unix timestamps
-		
-		var d1 = new Date(timeStr);
-		if (w2utils.isInt(timeStr)) d1 = new Date(Number(timeStr)); // for unix timestamps
-		var tmp = String(timeStr).split('-');
-		if (tmp.length == 3) d1 = new Date(tmp[0], Number(tmp[1])-1, tmp[2]); // yyyy-mm-dd
-		var tmp = String(timeStr).split('/');
-		if (tmp.length == 3) d1 = new Date(tmp[2], Number(tmp[0])-1, tmp[1]); // mm/dd/yyyy
-		if (d1 == 'Invalid Time') return '';
+	function age (dateStr) {
+		if (dateStr == '' || typeof dateStr == 'undefined' || dateStr == null) return '';
+		var d1 = new Date(dateStr);
+		if (w2utils.isInt(dateStr)) d1 = new Date(Number(dateStr)); // for unix timestamps
+		if (d1 == 'Invalid Date') return '';
 
 		var d2  = new Date();
 		var sec = (d2.getTime() - d1.getTime()) / 1000;
@@ -190,18 +214,12 @@ var w2utils = (function () {
 	}	
 		
 	function date (dateStr) {
-		var months = w2utils.settings.shortmonths;
 		if (dateStr == '' || typeof dateStr == 'undefined' || dateStr == null) return '';
-		if (w2utils.isInt(dateStr)) dateStr = Number(dateStr); // for unix timestamps
-		
 		var d1 = new Date(dateStr);
 		if (w2utils.isInt(dateStr)) d1 = new Date(Number(dateStr)); // for unix timestamps
-		var tmp = String(dateStr).split('-');
-		if (tmp.length == 3) d1 = new Date(tmp[0], Number(tmp[1])-1, tmp[2]); // yyyy-mm-dd
-		var tmp = String(dateStr).split('/');
-		if (tmp.length == 3) d1 = new Date(tmp[2], Number(tmp[0])-1, tmp[1]); // mm/dd/yyyy
 		if (d1 == 'Invalid Date') return '';
 
+		var months = w2utils.settings.shortmonths;
 		var d2   = new Date(); // today
 		var d3   = new Date(); 
 		d3.setTime(d3.getTime() - 86400000); // yesterday
@@ -228,11 +246,14 @@ var w2utils = (function () {
 		return (Math.floor(sizeStr / Math.pow(1024, i) * 10) / 10).toFixed(i == 0 ? 0 : 1) + ' ' + sizes[i];
 	}
 
-	function formatNumber (val) {
+	function formatNumber (val, groupSymbol) {
 		var ret = '';
+		if (typeof groupSymbol == 'undefined') groupSymbol = w2utils.settings.groupSymbol || ',';
 		// check if this is a number
 		if (w2utils.isFloat(val) || w2utils.isInt(val) || w2utils.isMoney(val)) {
-			ret = String(val).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,");
+			tmp = String(val).split('.');
+			ret = String(tmp[0]).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1"+ groupSymbol);
+			if (typeof tmp[1] != 'undefined') ret += '.' + tmp[1];
 		}
 		return ret;
 	}
@@ -245,10 +266,6 @@ var w2utils = (function () {
 
 		var dt = new Date(dateStr);
 		if (w2utils.isInt(dateStr)) dt = new Date(Number(dateStr)); // for unix timestamps
-		var tmp = String(dateStr).split('-');
-		if (tmp.length == 3) dt = new Date(tmp[0], Number(tmp[1])-1, tmp[2]); // yyyy-mm-dd
-		var tmp = String(dateStr).split('/');
-		if (tmp.length == 3) dt = new Date(tmp[2], Number(tmp[0])-1, tmp[1]); // mm/dd/yyyy
 		if (dt == 'Invalid Date') return '';
 
 		var year 	= dt.getFullYear();
@@ -259,7 +276,7 @@ var w2utils = (function () {
 			.replace('mon', w2utils.settings.shortmonths[month])
 			.replace(/yyyy/g, year)
 			.replace(/yyy/g, year)
-			.replace(/yy/g, String(year).substr(2))
+			.replace(/yy/g, year > 2000 ? 100 + parseInt(String(year).substr(2)) : String(year).substr(2))
 			.replace(/(^|[^a-z$])y/g, '$1'+year) 			// only y's that are not preceeded by a letter
 			.replace(/mm/g, (month + 1 < 10 ? '0' : '') + (month + 1))
 			.replace(/dd/g, (date < 10 ? '0' : '') + date)
@@ -267,11 +284,10 @@ var w2utils = (function () {
 			.replace(/(^|[^a-z$])d/g, '$1' + date); 		// only y's that are not preceeded by a letter
 	}
 
-
 	function formatTime (dateStr, format) { // IMPORTANT dateStr HAS TO BE valid JavaScript Date String
 		var months = w2utils.settings.shortmonths;
 		var fullMonths = w2utils.settings.fullmonths;
-		if (typeof format == 'undefined') format = this.settings.time_format;
+		if (typeof format == 'undefined') format = (this.settings.time_format == 'h12' ? 'hh:mi pm' : 'h24:mi');
 		if (typeof dateStr == 'undefined' || dateStr == '' || dateStr == null) return '';
 
 		var dt = new Date(dateStr);
@@ -706,32 +722,13 @@ var w2utils = (function () {
 			'<div class="w2ui-lock"></div>'+
 			'<div class="w2ui-lock-msg"></div>'
 		);
-		setTimeout(function () {
-			var lock = $(box).find('.w2ui-lock');
-			var mess = $(box).find('.w2ui-lock-msg');
-			lock.data('old_opacity', lock.css('opacity')).css('opacity', '0').show();
-			mess.data('old_opacity', mess.css('opacity')).css('opacity', '0').show();
-			setTimeout(function () {
-				var lock = $(box).find('.w2ui-lock');
-				var mess = $(box).find('.w2ui-lock-msg');
-				var left = ($(box).width()  - w2utils.getSize(mess, 'width')) / 2;
-				var top  = ($(box).height() * 0.9 - w2utils.getSize(mess, 'height')) / 2;
-				lock.css({
-					opacity : (options.opacity != undefined ? options.opacity : lock.data('old_opacity')),
-					left 	: '0px',
-					top 	: '0px',
-					width 	: '100%',
-					height 	: '100%'
-				});
-				if (!options.msg) mess.css({ 'background-color': 'transparent', 'border': '0px' }); 
-				if (options.spinner === true) options.msg = '<div class="w2ui-spinner" '+ (!options.msg ? 'style="width: 30px; height: 30px"' : '') +'></div>' + options.msg;
-				mess.html(options.msg).css({
-					opacity : mess.data('old_opacity'),
-					left	: left + 'px',
-					top		: top + 'px'
-				});
-			}, 10);
-		}, 10);
+		var lock = $(box).find('.w2ui-lock');
+		var mess = $(box).find('.w2ui-lock-msg');
+		if (!options.msg) mess.css({ 'background-color': 'transparent', 'border': '0px' }); 
+		if (options.spinner === true) options.msg = '<div class="w2ui-spinner" '+ (!options.msg ? 'style="width: 35px; height: 35px"' : '') +'></div>' + options.msg;
+		if (typeof options.opacity != 'undefined') lock.css('opacity', options.opacity);
+		lock.fadeIn(200);
+		mess.html(options.msg).fadeIn(200);
 		// hide all tags (do not hide overlays as the form can be in overlay)
 		$().w2tag();
 	}
@@ -790,6 +787,15 @@ var w2utils = (function () {
 			cache 	: false,
 			success : function (data, status, xhr) {
 				w2utils.settings = $.extend(true, w2utils.settings, data);
+				// apply translation to some prototype functions
+				var p = w2obj.grid.prototype;
+				for (var b in p.buttons) {
+					p.buttons[b].caption = w2utils.lang(p.buttons[b].caption);
+					p.buttons[b].hint 	 = w2utils.lang(p.buttons[b].hint);
+				}
+				p.msgDelete		= w2utils.lang(p.msgDelete);
+				p.msgNotJSON	= w2utils.lang(p.msgNotJSON);
+				p.msgRefresh	= w2utils.lang(p.msgRefresh);
 			},
 			error	: function (xhr, status, msg) {
 				console.log('ERROR: Cannot load locale '+ locale);
@@ -1127,118 +1133,262 @@ w2utils.keyboard = (function (obj) {
 	// w2overlay - appears under the element, there can be only one at a time
 
 	$.fn.w2overlay = function (html, options) {
-		if (!$.isPlainObject(options)) 		options = {};
-		if (!$.isPlainObject(options.css)) 	options.css = {};
-		if (this.length == 0 || html == '' || typeof html == 'undefined') { hide(); return $(this);	}
-		if ($('#w2ui-overlay').length > 0) $(document).click();
-		$('body').append('<div id="w2ui-overlay" class="w2ui-reset w2ui-overlay '+ 
-							($(this).parents('.w2ui-popup').length > 0 ? 'w2ui-overlay-popup' : '') +'">'+
-						'	<div></div>'+
-						'</div>');
-
+		var obj  = this;
+		var name = '';
+		var defaults = {
+			name		: null,		// it not null, then allows multiple concurent overlays
+			align		: 'none',	// can be none, left, right, both
+			left 		: 0,		// offset left
+			top 		: 0,		// offset top
+			tipLeft		: 30,		// tip offset left
+			width		: 0,		// fixed width
+			height		: 0,		// fixed height
+			maxWidth	: null,		// max width if any
+			maxHeight	: null,		// max height if any
+			style		: '',		// additional style for main div
+			'class'		: '',		// additional class name for main dvi
+			onShow		: null, 	// event on show
+			onHide		: null		// event on hide
+		}
+		if (!$.isPlainObject(options)) options = {};
+		options = $.extend(true, {}, defaults, options);
+		if (options.name) name = '-' + options.name;
+		// if empty then hide
+		if (this.length == 0 || html == '' || typeof html == 'undefined') { 
+			$(document).off('click', $('#w2ui-overlay'+ name).data('hide'));
+			$('#w2ui-overlay'+ name).remove();
+			return $(this); 
+		}
+		if ($('#w2ui-overlay'+ name).length > 0) {
+			$(document).off('click', $('#w2ui-overlay'+ name).data('hide'));
+			$('#w2ui-overlay'+ name).remove();
+		}
+		$('body').append(
+			'<div id="w2ui-overlay'+ name +'" style="display: none"'+
+			'		class="w2ui-reset w2ui-overlay '+ ($(this).parents('.w2ui-popup').length > 0 ? 'w2ui-overlay-popup' : '') +'">'+
+			'	<style></style>'+
+			'	<div style="'+ options.style +'" class="'+ options['class'] +'"></div>'+
+			'</div>'
+		);
 		// init
-		var obj = this;
-		var div = $('#w2ui-overlay div');
-		div.css(options.css).html(html);
-		if (typeof options['class'] != 'undefined') div.addClass(options['class']);
-		if (typeof options.top == 'undefined') options.top = 0;
-		if (typeof options.left == 'undefined') options.left = 0;
-		if (typeof options.width == 'undefined') options.width = 100;
-		if (typeof options.height == 'undefined') options.height = 0;
+		var div1 = $('#w2ui-overlay'+ name);
+		var div2 = div1.find(' > div');
+		div2.html(html);
+		// pick bg color of first div
+		var bc  = div2.css('background-color'); 
+		if (typeof bc != 'undefined' &&	bc != 'rgba(0, 0, 0, 0)' && bc != 'transparent') div1.css('background-color', bc);
 
-		// pickup bg color of first div
-		var bc  = div.css('background-color'); 
-		div = $('#w2ui-overlay');
-		if (typeof bc != 'undefined' &&	bc != 'rgba(0, 0, 0, 0)' && bc != 'transparent') div.css('background-color', bc);
-
-		div.css({
-				display 	 : 'none',
-				left 		 : ($(obj).offset().left + options.left) + 'px',
-				top 		 : ($(obj).offset().top + w2utils.getSize($(obj), 'height') + 3 + options.top) + 'px',
-				'min-width'  : (options.width ? options.width : 'auto'),
-				'min-height' : (options.height ? options.height : 'auto')
-			})
-			.fadeIn('fast')
-			.data('position', ($(obj).offset().left) + 'x' + ($(obj).offset().top + obj.offsetHeight))
-			.on('click', function (event) { 
-				if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;
+		div1.data('obj', obj)
+			.data('hide', hide)
+			.data('fixSize', fixSize)
+			.fadeIn('fast').on('mousedown', function (event) { 
+				$('#w2ui-overlay'+ name).data('keepOpen', true); 
+				if (['INPUT', 'TEXTAREA', 'SELECT'].indexOf(event.target.tagName) === -1) event.preventDefault(); 
 			});
+
+		// need time to display
+		fixSize();
+		setTimeout(function () {
+			fixSize();
+			$(document).off('click', hide).on('click', hide);
+			if (typeof options.onShow == 'function') options.onShow();
+		}, 10);
+		return $(this);
 
 		// click anywhere else hides the drop down
 		function hide () {
+			var div1 = $('#w2ui-overlay'+ name);
+			if (div1.data('keepOpen') === true) {
+				div1.removeData('keepOpen');
+				return;
+			}
 			var result;
 			if (typeof options.onHide == 'function') result = options.onHide();
 			if (result === false) return;
-			$('#w2ui-overlay').remove();
+			div1.remove();
 			$(document).off('click', hide);
+			clearInterval(div1.data('timer'));
 		}
 
-		// need time to display
-		setTimeout(fixSize, 0);
-		return $(this);
-
 		function fixSize () {
-			$(document).on('click', hide);
+			var div1 = $('#w2ui-overlay'+ name);
+			var div2 = div1.find(' > div');
 			// if goes over the screen, limit height and width
-			if ( $('#w2ui-overlay > div').length > 0) {
-				var h = $('#w2ui-overlay > div').height();
-				var w = $('#w2ui-overlay> div').width();
+			if (div1.length > 0) {
+				div2.height('auto').width('auto');
+				// width/height
+				var overflowX = false;
+				var overflowY = false;
+				var h = div2.height();
+				var w = div2.width();
+				if (options.width && options.width < w) w = options.width;
+				if (w < 30) w = 30;
+				// alignment
+				switch(options.align) {
+					case 'both':
+						options.left = 17;
+						options.width = w2utils.getSize($(obj), 'width');
+						break;
+					case 'left':
+						options.left = 17;
+						break;
+					case 'right':
+						options.tipLeft = w - 45;
+						options.left = w2utils.getSize($(obj), 'width') - w + 10;
+						break;
+				}
+				// adjust position
+				var tmp = (w - 17) / 2;
+				var boxLeft  = options.left;
+				var boxWidth = options.width;
+				var tipLeft  = options.tipLeft;
+				if (w == 30) boxWidth = 30; else boxWidth = (options.width ? options.width : 'auto');
+				if (tmp < 25) {
+					boxLeft = 25 - tmp;
+					tipLeft = Math.floor(tmp);
+				}
+				// Y coord
+				div1.css({
+					top			: (obj.offset().top + w2utils.getSize(obj, 'height') + options.top + 7) + 'px',
+					left		: ((obj.offset().left > 25 ? obj.offset().left : 25) + boxLeft) + 'px',
+					'min-width' : boxWidth,
+					'min-height': (options.height ? options.height : 'auto')
+				});
 				// $(window).height() - has a problem in FF20
-				var max = window.innerHeight - $('#w2ui-overlay > div').offset().top - 7;
-				if (h > max) $('#w2ui-overlay> div').height(max).width(w + w2utils.scrollBarSize()).css({ 'overflow-y': 'auto' });
+				var maxHeight = window.innerHeight + $(document).scrollTop() - div2.offset().top - 7;
+				var maxWidth  = window.innerWidth + $(document).scrollLeft() - div2.offset().left - 7;
+				if (maxHeight > -30 && maxHeight < 210) {
+					// show on top
+					maxHeight = div2.offset().top - $(document).scrollTop() - 7;
+					if (options.maxHeight && maxHeight > options.maxHeight) maxHeight = options.maxHeight;
+					if (h > maxHeight) { 
+						overflowY = true;
+						div2.height(maxHeight).width(w).css({ 'overflow-y': 'auto' });
+						h = maxHeight;
+					}
+					div1.css('top', ($(obj).offset().top - h - 24 + options.top) + 'px');
+					div1.find('>style').html(
+						'#w2ui-overlay'+ name +':before { display: none; margin-left: '+ parseInt(tipLeft) +'px; }'+
+						'#w2ui-overlay'+ name +':after { display: block; margin-left: '+ parseInt(tipLeft) +'px; }'
+					);
+				} else {
+					// show under
+					if (options.maxHeight && maxHeight > options.maxHeight) maxHeight = options.maxHeight;
+					if (h > maxHeight) { 
+						overflowY = true;
+						div2.height(maxHeight).width(w).css({ 'overflow-y': 'auto' });
+					}
+					div1.find('>style').html(
+						'#w2ui-overlay'+ name +':before { display: block; margin-left: '+ parseInt(tipLeft) +'px; }'+
+						'#w2ui-overlay'+ name +':after { display: none; margin-left: '+ parseInt(tipLeft) +'px; }'
+					);
+				}
 				// check width
-				w = $('#w2ui-overlay> div').width();
-				max = window.innerWidth - $('#w2ui-overlay > div').offset().left - 7;
-				if (w > max) $('#w2ui-overlay> div').width(max).css({ 'overflow-x': 'auto' });
-				// onShow event
-				if (typeof options.onShow == 'function') options.onShow();
+				w = div2.width();
+				maxWidth = window.innerWidth + $(document).scrollLeft() - div2.offset().left - 7;
+				if (options.maxWidth && maxWidth > options.maxWidth) maxWidth = options.maxWidth;
+				if (w > maxWidth && options.align != 'both') {
+					options.align = 'right';
+					setTimeout(function () { fixSize(); }, 1);
+				}
+				// check scroll bar
+				if (overflowY && overflowX) div2.width(w + w2utils.scrollBarSize() + 2);
 			}
 		}
 	};
 
 	$.fn.w2menu = function (menu, options) {
-		if (typeof options.select == 'undefined' && typeof options.onSelect == 'function') options.select = options.onSelect;
-		if (typeof options.select != 'function') {
-			console.log('ERROR: options.select is required to be a function, not '+ typeof options.select + ' in $().w2menu(menu, options)');
-			return $(this);
+		/* 
+		ITEM STRUCTURE
+			item : {
+				id		: null,
+				text 	: '',
+				style	: '',
+				hidden	: true
+				...
+			}
+		*/		
+		var defaults = {
+			index		: null, 	// current selected
+			items 		: [],
+			render		: null,
+			onSelect 	: null
 		}
-		if (!$.isArray(menu)) {
-			console.log('ERROR: first parameter should be an array of objects or strings in $().w2menu(menu, options)');
-			return $(this);
+		var name = '';
+		if (menu == 'refresh') {
+			// if not show - call blur
+			if ($('#w2ui-overlay'+ name).length > 0) {
+				$('#w2ui-overlay'+ name +' > div').html(getMenuHTML(), options);
+				var fun = $('#w2ui-overlay'+ name).data('fixSize');
+				if (typeof fun == 'function') fun();
+			} else {
+				$(this).w2menu(options);
+			}
+		} else {
+			if (arguments.length == 1) options = menu; else options.items = menu;
+			if (typeof options != 'object') options = {};
+			options = $.extend({}, defaults, options);
+			if (options.name) name = '-' + options.name;
+			if (typeof options.select == 'function' && typeof options.onSelect != 'function') options.onSelect = options.select;
+			if (typeof options.onRender == 'function' && typeof options.render != 'function') options.render = options.onRender;
+			// since only one overlay can exist at a time
+			$.fn.w2menuHandler = function (event, index) {
+				if (typeof options.onSelect == 'function') {
+					options.onSelect({
+						index	: index,
+						item	: options.items[index],
+						originalEvent: event
+					}); 
+				}
+			};
+			return $(this).w2overlay(getMenuHTML(), options);
 		}
-		// since only one overlay can exist at a time
-		$.fn.w2menuHandler = function (event, index) {
-			options.select(menu[index], event, index); 
-		};
-		return $(this).w2overlay(getMenuHTML(), options);
 
 		function getMenuHTML () { 
-			var menu_html = '<table cellspacing="0" cellpadding="0" class="w2ui-drop-menu">';
-			for (var f = 0; f < menu.length; f++) { 
-				var mitem = menu[f];
+			var count		= 0;
+			var menu_html	= '<table cellspacing="0" cellpadding="0" class="w2ui-drop-menu">';
+			for (var f = 0; f < options.items.length; f++) { 
+				var mitem = options.items[f];
 				if (typeof mitem == 'string') {
-					var tmp = mitem.split('|');
-					// 1 - id, 2 - text, 3 - image, 4 - icon
-					mitem = { id: tmp[0], text: tmp[0], img: null, icon: null };
-					if (tmp[1]) mitem.text = tmp[1];
-					if (tmp[2]) mitem.img  = tmp[2];
-					if (tmp[3]) mitem.icon = tmp[3];
+					mitem = { id: mitem, text: mitem };
 				} else {
 					if (typeof mitem.text != 'undefined' && typeof mitem.id == 'undefined') mitem.id = mitem.text;
 					if (typeof mitem.text == 'undefined' && typeof mitem.id != 'undefined') mitem.text = mitem.id;
 					if (typeof mitem.caption != 'undefined') mitem.text = mitem.caption;
-					if (typeof mitem.img == 'undefined') mitem.img = null;
-					if (typeof mitem.icon == 'undefined') mitem.icon = null;
+					var img  = mitem.img;
+					var icon = mitem.icon;
+					if (typeof img  == 'undefined') img  = null;
+					if (typeof icon == 'undefined') icon = null;
 				}
-				var img = '<td>&nbsp;</td>';
-				if (mitem.img)  img = '<td><div class="w2ui-tb-image w2ui-icon '+ mitem.img +'"></div></td>';
-				if (mitem.icon) img = '<td align="center"><div class="w2ui-tb-image"><span class="'+ mitem.icon +'"></span></div></td>';
-				menu_html += 
-					'<tr onmouseover="$(this).addClass(\'w2ui-selected\');" onmouseout="$(this).removeClass(\'w2ui-selected\');" '+
-					'		onclick="$(document).click(); $.fn.w2menuHandler(event, \''+ f +'\');">'+
-						img +
-					'	<td>'+ mitem.text +'</td>'+
-					'</tr>';
+				if (mitem.hidden !== true) {
+					var imgd = '';
+					var txt = mitem.text;
+					if (typeof options.render == 'function') txt = options.render(mitem, options);
+					if (img)  imgd = '<td><div class="w2ui-tb-image w2ui-icon '+ img +'"></div></td>';
+					if (icon) imgd = '<td align="center"><span class="w2ui-icon '+ icon +'"></span></td>';
+					// render only if non-empty
+					if (typeof txt != 'undefined' && txt != '' && !(/^-+$/.test(txt))) {
+						var bg = (count % 2 == 0 ? 'w2ui-item-even' : 'w2ui-item-odd');
+						if (options.altRows !== true) bg = '';
+						menu_html += 
+							'<tr index="'+ f + '" style="'+ (mitem.style ? mitem.style : '') +'" '+
+							'		class="'+ bg +' '+ (options.index == count ? 'w2ui-selected' : '') +'"'+
+							'		onclick="$(\'#w2ui-overlay\').remove(); $.fn.w2menuHandler(event, \''+ f +'\'); event.stopPropagation();" '+
+							'		onmouseover="$(this).addClass(\'w2ui-selected\');" '+
+							'		onmouseout="$(this).removeClass(\'w2ui-selected\');">'+
+								imgd +
+							'	<td>'+ txt +'</td>'+
+							'</tr>';
+						count++;
+					} else {
+						// horizontal line
+						menu_html += '<tr><td colspan="2" style="padding: 6px"><div style="border-top: 1px solid silver;"></div></td></tr>';						
+					}
+				}
+				options.items[f] = mitem;
+			}
+			if (count == 0) {
+				menu_html += '<tr><td style="text-align: center; color: #999">No items</td></tr>';
 			}
 			menu_html += "</table>";
 			return menu_html;

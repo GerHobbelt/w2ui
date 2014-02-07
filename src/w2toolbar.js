@@ -10,6 +10,7 @@
 *
 * == 1.4 changes
 *	- deleted getSelection().removeAllRanges() - see https://github.com/vitmalina/w2ui/issues/323
+*	- fixed submenu event bugs
 *
 ************************************************************************/
 
@@ -274,7 +275,6 @@
 
 		refresh: function (id) {
 			var time = (new Date()).getTime();
-			// if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'refresh', target: (typeof id != 'undefined' ? id : this.name), item: this.get(id) });
 			if (eventData.isCancelled === true) return false;
@@ -320,7 +320,6 @@
 
 		resize: function () {
 			var time = (new Date()).getTime();
-			// if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'resize', target: this.name });
 			if (eventData.isCancelled === true) return false;
@@ -381,7 +380,7 @@
 									img +
 									(item.text !== '' ? '<td class="w2ui-tb-caption" nowrap>'+ item.text +'</td>' : '') +
 									(((item.type == 'drop' || item.type == 'menu') && item.arrow !== false) ?
-										'<td class="w2ui-tb-down" nowrap>&nbsp;&nbsp;&nbsp;</td>' : '') +
+										'<td class="w2ui-tb-down" nowrap><div></div></td>' : '') +
 							'  </tr></table>'+
 							'</td></tr></table>';
 					break;
@@ -406,17 +405,15 @@
 			return html;
 		},
 
-		menuClick: function (id, menu_index, event) {
-			// if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
+		menuClick: function (event) {
 			var obj = this;
-			var it  = this.get(id);
-			if (it && !it.disabled) {
+			if (event.item && !event.item.disabled) {
 				// event before
-				var eventData = this.trigger({ phase: 'before', type: 'click', target: (typeof id != 'undefined' ? id : this.name), item: this.get(id),
-					subItem: (typeof menu_index != 'undefined' && this.get(id) ? this.get(id).items[menu_index] : null), originalEvent: event });
+				var eventData = this.trigger({ phase: 'before', type: 'click', target: event.item.id + ':' + event.subItem.id, item: event.item,
+					subItem: event.subItem, originalEvent: event.originalEvent });
 				if (eventData.isCancelled === true) return false;
 
-				// normal processing
+				// intentionaly blank
 
 				// event after
 				this.trigger($.extend(eventData, { phase: 'after' }));
@@ -424,7 +421,6 @@
 		},
 
 		click: function (id, event) {
-			// if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
 			var obj = this;
 			var it  = this.get(id);
 			if (it && !it.disabled) {
@@ -458,12 +454,17 @@
 						setTimeout(function () {
 							var el = $('#tb_'+ obj.name +'_item_'+ w2utils.escapeId(it.id));
 							if (!$.isPlainObject(it.overlay)) it.overlay = {};
+							var left = (el.width() - 50) / 2;
+							if (left > 19) left = 19;
 							if (it.type == 'drop') {
-								el.w2overlay(it.html, $.extend({ left: (el.width() - 50) / 2, top: 3 }, it.overlay));
+								el.w2overlay(it.html, $.extend({ left: left, top: 3 }, it.overlay));
 							}
 							if (it.type == 'menu') {
-								el.w2menu(it.items, $.extend({ left: (el.width() - 50) / 2, top: 3 }, it.overlay, {
-									select: function (item, event, index) { obj.menuClick(it.id, index, event); }
+								el.w2menu(it.items, $.extend({ left: left, top: 3 }, it.overlay, {
+									select: function (event) { 										
+										obj.menuClick({ item: it, subItem: event.item, originalEvent: event.originalEvent }); 
+										hideDrop();
+									}
 								}));
 							}
 							// window.click to hide it

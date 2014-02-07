@@ -16,6 +16,8 @@
 		this.box			= null;		// DOM Element that holds the element
 		this.name			= null;		// unique name for w2ui
 		this.vType			= null;
+		this.extraCols		= [];
+		this.itemExtra = {};
 		this.items			= [];
 		this.menu			= [];
 		this.multiselect	= true;		// multiselect support
@@ -32,6 +34,9 @@
 		this.onDestroy		= null;
 
 		$.extend(true, this, w2obj.listview, options);
+		for (var i = 0; i < this.extraCols.length; i++) {
+			this.itemExtra[this.extraCols[i].name] = '';
+		}
 	};
 
 	// ====================================================
@@ -46,12 +51,12 @@
 				method.vType = method.viewType;
 				delete method.viewType;
 			}
-			var itms  = method.items;
+			var itms = method.items;
 			obj = new w2listview(method);
 			$.extend(obj, { items: [], handlers: [] });
 			if ($.isArray(itms)) {
 				for (var i = 0; i < itms.length; i++) {
-					obj.items[i] = $.extend({}, w2listview.prototype.item, itms[i]);
+					obj.items[i] = $.extend({}, w2listview.prototype.item, obj.itemExtra, itms[i]);
 				}
 			}
 			if ($(this).length !== 0) {
@@ -79,6 +84,7 @@
 			caption			: '',
 			description		: '',
 			icon			: null,
+			img				: null,
 			selected		: false,
 			onClick			: null,
 			onDblClick		: null,
@@ -90,6 +96,8 @@
 		viewType: function (value) {
 			if (arguments.length === 0) {
 				switch (this.vType) {
+					case 'table':
+						return 'table';
 					case 'icon-tile':
 						return 'icon-tile';
 					case 'icon-large':
@@ -103,7 +111,7 @@
 				this.vType = value;
 				var vt = 'w2ui-' + this.viewType();
 				$(this.box)
-					.removeClass('w2ui-icon-small w2ui-icon-medium w2ui-icon-large w2ui-icon-tile')
+					.removeClass('w2ui-icon-small w2ui-icon-medium w2ui-icon-large w2ui-icon-tile w2ui-table')
 					.addClass(vt);
 				return vt;
 			}
@@ -118,7 +126,7 @@
 			// assume it is array
 			for (var r = 0; r < item.length; r++) {
 				// checks
-				if (String(item[r].id) == 'undefined') {
+				if (typeof item[r].id === 'undefined') {
 					console.log('ERROR: The parameter "id" is required but not supplied. (obj: '+ this.name +')');
 					return;
 				}
@@ -130,13 +138,9 @@
 					console.log('ERROR: The parameter "id='+ item[r].id +'" is not unique within the current items. (obj: '+ this.name +')');
 					return;
 				}
-				//if (!w2utils.isAlphaNumeric(item[r].id)) {
-				//	console.log('ERROR: The parameter "id='+ item[r].id +'" must be alpha-numeric + "-_". (obj: '+ this.name +')');
-				//	return;
-				//}
 				// add item
-				var newItm = $.extend({}, w2listview.prototype.item, item[r]);
-				if (id === null || typeof id == 'undefined') {
+				var newItm = $.extend({}, w2listview.prototype.item, this.itemExtra, item[r]);
+				if (id === null || typeof id === 'undefined') {
 					this.items.push(newItm);
 				} else {
 					var middle = this.get(id, true);
@@ -155,7 +159,7 @@
 				// remove from array
 				this.items.splice(idx, 1);
 				// remove from screen
-				$(this.box).find('#itm_'+ w2utils.escapeId(arguments[i])).remove();
+				$('#itm_'+ w2utils.escapeId(arguments[i])).remove();
 			}
 			return removed;
 		},
@@ -190,16 +194,13 @@
 
 			if (!addSelection) this.unselect();
 			if (!itm.selected) {
-				$(this.box)
-					.find('#itm_'+ w2utils.escapeId(id))
-					.addClass('w2ui-selected');
+				$('#itm_'+ w2utils.escapeId(id)).addClass('w2ui-selected');
 				itm.selected = true;
 			}
 			return itm.selected;
 		},
 
 		unselect: function (id) {
-			var obj = this;
 			var i = 0;
 			if (arguments.length === 0) {
 				for (; i < this.items.length; i++) doUnselect(this.items[i]);
@@ -210,10 +211,8 @@
 
 			function doUnselect(itm) {
 				if (itm !== null && itm.selected) {
+					$('#itm_'+ w2utils.escapeId(itm.id)).removeClass('w2ui-selected');
 					itm.selected = false;
-					$(obj.box)
-						.find('#itm_'+ w2utils.escapeId(itm.id))
-						.removeClass('w2ui-selected');
 				}
 			}
 		},
@@ -225,18 +224,18 @@
 		},
 
 		scrollIntoView: function (id) {
-			if (typeof id != 'undefined') {
+			if (typeof id !== 'undefined') {
 				var itm = this.get(id);
 				if (itm === null) return;
-				var body	= $(this.box);
-				var node	= $(this.box).find('#itm_'+ w2utils.escapeId(id));
-				var offset	= node.offset().top - body.offset().top;
+				var $box	= $(this.box);
+				var node	= $('#itm_'+ w2utils.escapeId(id));
+				var offset	= node.offset().top - $box.offset().top;
 				var nodeHeight = w2utils.getSize(node, 'height');
-				if (offset + nodeHeight > body.height()) {
-					body.scrollTop( body.scrollTop() + offset + nodeHeight - body.height() );
+				if (offset + nodeHeight > $box.height()) {
+					$box.scrollTop($box.scrollTop() + offset + nodeHeight - $box.height());
 				}
 				if (offset <= 0) {
-					body.scrollTop( body.scrollTop() + offset);
+					$box.scrollTop($box.scrollTop() + offset);
 				}
 			}
 		},
@@ -274,13 +273,9 @@
 			if (itm === null) return;
 			var oldItm = this.getFocused();
 			if (oldItm !== null) {
-				$(this.box)
-					.find('#itm_'+ w2utils.escapeId(oldItm.id))
-					.removeClass('w2ui-focused');
+				$('#itm_'+ w2utils.escapeId(oldItm.id)).removeClass('w2ui-focused');
 			}
-			$(this.box)
-				.find('#itm_'+ w2utils.escapeId(id))
-				.addClass('w2ui-focused');
+			$('#itm_'+ w2utils.escapeId(id)).addClass('w2ui-focused');
 			this.curFocused = id;
 
 			// update view
@@ -326,13 +321,16 @@
 			var rslt = eventData.isCancelled !== true;
 			if (rslt) {
 				// default behaviour
+				if (event.keyCode == 13) obj.dblClick(obj.items[idx].id, event);
 				if (event.keyCode == 32) obj.click(obj.items[idx].id, event);
+				if (event.keyCode == 33) processNeighbor('pgUp');
+				if (event.keyCode == 34) processNeighbor('pgDown');
 				if (event.keyCode == 37) processNeighbor('left');
 				if (event.keyCode == 39) processNeighbor('right');
 				if (event.keyCode == 38) processNeighbor('up');
 				if (event.keyCode == 40) processNeighbor('down');
 				// cancel event if needed
-				if ($.inArray(event.keyCode, [32, 37, 38, 39, 40]) != -1) {
+				if ($.inArray(event.keyCode, [13, 32, 33, 34, 37, 38, 39, 40]) != -1) {
 					if (event.preventDefault) event.preventDefault();
 					if (event.stopPropagation) event.stopPropagation();
 				}
@@ -343,17 +341,18 @@
 			return rslt;
 
 			function processNeighbor(neighbor) {
-				var newIdx;
-				if (neighbor === 'up') newIdx = idx - itemsInLine();
-				if (neighbor === 'down') newIdx = idx + itemsInLine();
-				if (neighbor === 'left') newIdx = idx - 1;
-				if (neighbor === 'right') newIdx = idx + 1;
+				var newIdx = idx;
+				var colsCnt = colsCount();
+				if (neighbor === 'up') newIdx = idx - colsCnt;
+				if (neighbor === 'down') newIdx = idx + colsCnt;
+				if (neighbor === 'left' && colsCnt > 1) newIdx = idx - 1;
+				if (neighbor === 'right' && colsCnt > 1) newIdx = idx + 1;
 				if (newIdx >= 0 && newIdx < obj.items.length && newIdx != idx) {
 					obj.userSelect(obj.items[newIdx].id, event, false);
 				}
 			}
 
-			function itemsInLine() {
+			function colsCount() {
 				var lv = $(obj.box).find('> ul');
 				return parseInt(lv.width() / w2utils.getSize(lv.find('> li').get(0), 'width'), 10);
 			}
@@ -369,12 +368,11 @@
 			if (rslt) {
 				// default action
 				if (obj.menu.length > 0) {
-					$(obj.box).find('#itm_'+ w2utils.escapeId(id))
+					$('#itm_'+ w2utils.escapeId(id))
 						.w2menu(obj.menu, {
 							left: (event ? event.offsetX || event.pageX : 50) - 25,
 							select: function (item, event, index) { obj.menuClick(id, index, event); }
-						}
-					);
+						});
 				}
 				// event after
 				obj.trigger($.extend(eventData, { phase: 'after' }));
@@ -395,58 +393,155 @@
 			return rslt;
 		},
 
-		getItemHTML: function (item, onlyInner) {
-			var iconClass = (item.icon !== null && typeof item.icon != 'undefined') ? ' '+item.icon : ' icon-none';
-			var innerHTML =
-					'<div class="icon-small' + iconClass + '"></div> ' +
-					'<div class="icon-medium' + iconClass + '"></div> ' +
-					'<div class="icon-large' + iconClass + '"></div> ' +
-					'<div class="caption">' + item.caption + '</div> ' +
-					'<div class="description">' + item.description + '</div>';
-			if (onlyInner) {
-				return innerHTML;
-			} else {
-				return '<li id="itm_'+ item.id +'" ' +
-					'onclick="w2ui[\''+ this.name +'\'].click(\''+ item.id +'\', event);" '+'' +
-					'ondblclick="w2ui[\''+ this.name +'\'].dblClick(\''+ item.id +'\', event);" '+
-					'oncontextmenu="w2ui[\''+ this.name +'\'].contextMenu(\''+ item.id +'\', event); if (event.preventDefault) event.preventDefault();" '+
-					'>'+ innerHTML + '</li>';
-			}
-		},
-
 		refresh: function (id) {
+			var obj = this;
 			var time = (new Date()).getTime();
-			if (String(id) == 'undefined') {
-				// refresh all items
-				this.render(this.box);
-			} else {
-				// create or refresh only one item
 
-				// event before
-				var eventData = this.trigger({ phase: 'before', type: 'refresh', target: (typeof id != 'undefined' ? id : this.name), object: this.get(id) });
-				if (eventData.isCancelled === true) return false;
-
-				var idx = this.get(id, true);
+			var idx;
+			if (typeof id !== 'undefined') {
+				idx = this.get(id, true);
 				if (idx === null) return false;
-				var jq_el = $(this.box).find('#itm_'+ w2utils.escapeId(id));
-				if (jq_el.length === 0) {
-					// does not exist - create it
-					var nextItm;
-					if (idx != this.items.length-1) {
-						nextItm = $(this.box).find('#itm_'+ w2utils.escapeId(this.items[idx+1].id));
-						if (nextItm.length === 0) nextItm = undefined;
-					}
-					if (!nextItm) nextItm = $(this.box).find('#itmlast');
-					nextItm.before(this.getItemHTML(this.items[idx], false));
-				} else {
-					// refresh
-					jq_el.html(this.getItemHTML(this.items[idx], true));
-				}
-				// event after
-				this.trigger($.extend(eventData, { phase: 'after' }));
 			}
+
+			// event before
+			var eventData = this.trigger({ phase: 'before', type: 'refresh', target: (typeof id !== 'undefined' ? id : this.name), object: this.items[idx] });
+			if (eventData.isCancelled === true) return false;	
+
+			// default action
+			if (typeof id === 'undefined') {
+				// refresh all items
+				var itms = document.createDocumentFragment();
+				for (var i = 0; i < this.items.length; i++) 
+					itms.appendChild(getItemElement(this.items[i]));
+				var lst = this.lastItm.parentNode;
+				while (lst.firstChild !== this.lastItm)
+					lst.removeChild(lst.firstChild);
+				this.lastItm.parentNode.insertBefore(itms, this.lastItm);
+			} else {
+				// refresh single item
+				var itm = document.getElementById('itm_'+ w2utils.escapeId(id));
+				if (itm) {
+					// update existing
+					itm.parentNode.replaceChild(getItemElement(this.items[idx]), itm);
+				} else {
+					// create new
+					var nextItm;
+					if (idx != this.items.length-1)
+						nextItm = document.getElementById('itm_'+ w2utils.escapeId(this.items[idx+1].id));
+					if (!nextItm) nextItm = this.lastItm;
+					nextItm.parentNode.insertBefore(getItemElement(this.items[idx]), nextItm);
+				}
+			}
+
+			// event after
+			this.trigger($.extend(eventData, { phase: 'after' }));
 
 			return (new Date()).getTime() - time;
+
+			function getItemElement(item) {
+				var imgClass = (item.icon !== null && typeof item.icon !== 'undefined') ? ' '+item.icon : ' icon-none';
+				if (item.img !== null && typeof item.img !== 'undefined') imgClass = ' w2ui-icon '+item.img;
+
+				var withDescription = (typeof item.description !== undefined && item.description !== '');
+				var withExtra = (obj.extraCols.length > 0);
+				var rslt = getItemTemplate(withDescription, withExtra);
+				rslt.id = 'itm_' + item.id;
+				rslt.setAttribute('item_id', item.id);
+				var itmDiv = rslt.querySelector('div');
+				itmDiv.querySelector('div.w2ui-listview-img').className = 'w2ui-listview-img'+imgClass;
+				itmDiv.querySelector('div.caption').textContent = item.caption;
+				if (withDescription)
+					itmDiv.querySelector('div.description').textContent = item.description;
+				if (withExtra) {
+					var itmExtra = itmDiv.querySelector('div.extra div');
+					for (var i = 0; i < obj.extraCols.length; i++) {
+						var colName = obj.extraCols[i].name;
+						if (colName in item)
+							itmExtra.querySelector('div.'+colName).textContent = item[colName];
+					}
+				}
+				return rslt;
+			}
+
+			function getItemTemplate(withDescription, withExtra) {
+				var template, itmDiv;
+				if (!withDescription && !withExtra) {
+					if ('captionOnlyTemplate' in obj) {
+						template = obj.captionOnlyTemplate;
+					} else {
+						template = document.createElement('li');
+						template.setAttribute('onclick', 'w2ui[\''+obj.name+'\'].click(this.getAttribute(\'item_id\'), event);');
+						template.setAttribute('ondblclick', 'w2ui[\''+obj.name+'\'].dblClick(this.getAttribute(\'item_id\'), event);');
+						template.setAttribute('oncontextmenu', 'w2ui[\''+obj.name+'\'].contextMenu(this.getAttribute(\'item_id\'), event); if (event.preventDefault) event.preventDefault();');
+						itmDiv = appendDiv(template);
+						appendDiv(itmDiv, 'w2ui-listview-img');
+						appendDiv(itmDiv, 'caption');
+						obj.captionOnlyTemplate = template;
+					}
+
+				} else
+				if (withDescription && !withExtra) {
+					if ('captionWithDescription' in obj) {
+						template = obj.captionWithDescriptionTemplate;
+					} else {
+						template = getItemTemplate(false, false);
+						itmDiv = template.querySelector('div');
+						appendDiv(itmDiv, 'description');
+						obj.captionWithDescriptionTemplate = template;
+					}
+				} else
+				if (!withDescription && withExtra) {
+					if ('captionWithExtra' in obj) {
+						template = obj.captionWithExtra;
+					} else {
+						template = appendExtra(getItemTemplate(false, false));
+						obj.captionWithExtra = template;
+					}
+				} else
+				if (withDescription && withExtra) {
+					if ('captionWithDescriptionAndExtra' in obj) {
+						template = obj.captionWithDescriptionAndExtra;
+					} else {
+						template = appendExtra(getItemTemplate(true, false));
+						obj.captionWithDescriptionAndExtra = template;
+					}
+				}
+				return template.cloneNode(true);
+
+				function appendExtra(node) {
+					var itmDiv = node.querySelector('div');
+					var extra = appendDiv(itmDiv, 'extra');
+					extra.style.width = extraColsWidth() + 'px';
+					extra = appendDiv(extra);
+					for (var i = 0; i < obj.extraCols.length; i++) {
+						var col = obj.extraCols[i];
+						var extraCol = appendDiv(extra, col.name);
+						extraCol.style.width = col.width+'px';
+						if ('align' in col) extraCol.style.textAlign = col.align;
+						if ('paddingLeft' in col) extraCol.style.paddingLeft = col.paddingLeft+'px';
+						if ('paddingRight' in col) extraCol.style.paddingRight = col.paddingRight+'px';
+					}
+					return node;
+
+					function extraColsWidth() {
+						var rslt = 0;
+						for (var i = 0; i < obj.extraCols.length; i++) {
+							if (!('width' in obj.extraCols[i])) obj.extraCols[i].width = 100;
+							rslt += obj.extraCols[i].width;
+						}
+						return rslt;
+					}
+				}
+			}
+
+			function appendDiv(parentElement, cls, txt) {
+				var div = document.createElement('div');
+				if (typeof cls !== 'undefined') div.className = cls;
+				if (typeof txt !== 'undefined') div.textContent = txt;
+				parentElement.appendChild(div);
+				return div;
+			}
+
 		},
 
 		render: function (box) {
@@ -455,24 +550,33 @@
 			var eventData = this.trigger({ phase: 'before', type: 'render', target: this.name, box: box });
 			if (eventData.isCancelled === true) return false;
 			// default action
-			if (String(box) != 'undefined' && box !== null && this.box !== box) {
-				if ($(this.box).find('> ul #itmlast').length > 0) {
+			if (typeof box !== 'undefined' && box !== null && this.box !== box) {
+				if (this.lastItm) {
+					while (this.box.hasChildNodes())
+						this.box.removeChild(this.box.lastChild);
 					$(this.box)
 						.removeAttr('name')
-						.removeClass('w2ui-reset w2ui-listview w2ui-icon-small w2ui-icon-medium w2ui-icon-large w2ui-icon-tile')
-						.html('');
+						.removeClass('w2ui-reset w2ui-listview w2ui-icon-small w2ui-icon-medium w2ui-icon-large w2ui-icon-tile w2ui-table');
 				}
 				this.box = box;
 			}
 			if (!this.box) return false;
+			while (this.box.hasChildNodes())
+				this.box.removeChild(this.box.lastChild);
+			this.box.scrollTop = 0;
+
 			// render all items
-			var html = '<ul>';
-			for (var i = 0; i < this.items.length; i++) html += this.getItemHTML(this.items[i], false);
-			html += '<li id="itmlast" style="display: none;"></li></ul>';
+			var list = document.createElement('ul');
+			var lastItm = document.createElement('li');
+			lastItm.className = 'itmlast';
+			lastItm.style.display = 'none';
+			list.appendChild(lastItm);
 			$(this.box)
 				.attr('name', this.name)
 				.addClass('w2ui-reset w2ui-listview w2ui-' + this.viewType())
-				.html(html);
+				.append(list);
+			this.lastItm = lastItm;
+			this.refresh();
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
 			return (new Date()).getTime() - time;
@@ -483,11 +587,12 @@
 			var eventData = this.trigger({ phase: 'before', type: 'destroy', target: this.name });
 			if (eventData.isCancelled === true) return false;
 			// clean up
-			if ($(this.box).find('> ul #itmlast').length > 0) {
+			if (this.box) {
+				this.lastItm = null;
 				$(this.box)
+					.empty()
 					.removeAttr('name')
-					.removeClass('w2ui-reset w2ui-listview w2ui-icon-small w2ui-icon-medium w2ui-icon-large w2ui-icon-tile')
-					.html('');
+					.removeClass('w2ui-reset w2ui-listview w2ui-icon-small w2ui-icon-medium w2ui-icon-large w2ui-icon-tile w2ui-table');
 			}
 			delete w2ui[this.name];
 			// event after

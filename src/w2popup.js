@@ -13,6 +13,7 @@
 *
 * == 1.4 changes
 *	- deleted getSelection().removeAllRanges() - see https://github.com/vitmalina/w2ui/issues/323
+*	- new: w2popup.status can be ['closed', 'opening', 'open', 'closing', resizing', 'moving']
 *
 ************************************************************************/
 
@@ -82,6 +83,7 @@ var w2popup = {};
 			showMax			: false,
 			transition		: null
 		},
+		status		: 'closed', 	// string that describes current status
 		handlers	: [],
 		onOpen		: null,
 		onClose		: null,
@@ -91,6 +93,10 @@ var w2popup = {};
 
 		open: function (options) {
 			var obj = this;
+			if (w2popup.status == 'closing') {
+				setTimeout(function () { obj.open.call(obj, options); }, 100);
+				return;
+			}
 			// get old options and merge them
 			var old_options = $('#w2ui-popup').data('options');
 			var options = $.extend({}, this.defaults, { body : '' }, old_options, options);
@@ -144,7 +150,8 @@ var w2popup = {};
 			if ($('#w2ui-popup').length == 0) {
 				// trigger event
 				var eventData = this.trigger({ phase: 'before', type: 'open', target: 'popup', options: options, present: false });
-				if (eventData.isCancelled === true) return;			
+				if (eventData.isCancelled === true) return;
+				w2popup.status = 'opening';
 				// output message
 				w2popup.lockScreen(options);			
 				var msg = '<div id="w2ui-popup" class="w2ui-popup" style="'+
@@ -153,9 +160,9 @@ var w2popup = {};
 								'left: '+ left +'px; top: '+ top +'px;">';
 				if (options.title != '') { 
 					msg +='<div class="w2ui-msg-title">'+
-						  (options.showClose ? '<div class="w2ui-msg-button w2ui-msg-close" onclick="w2popup.close(); '+
+						  (options.showClose ? '<div class="w2ui-msg-button w2ui-msg-close" onmousedown="event.stopPropagation()" onclick="w2popup.close(); '+
 						  					   'if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;">Close</div>' : '')+ 
-						  (options.showMax ? '<div class="w2ui-msg-button w2ui-msg-max" onclick="w2popup.toggle()">Max</div>' : '') + 
+						  (options.showMax ? '<div class="w2ui-msg-button w2ui-msg-max" onmousedown="event.stopPropagation()" onclick="w2popup.toggle()">Max</div>' : '') + 
 							  options.title +
 						  '</div>'; 
 				}
@@ -194,6 +201,7 @@ var w2popup = {};
 						'-o-transform': ''
 					});
 					// event after
+					w2popup.status = 'open';
 					obj.trigger($.extend(eventData, { phase: 'after' }));
 				}, options.speed * 1000);
 			} else {
@@ -201,6 +209,7 @@ var w2popup = {};
 				var eventData = this.trigger({ phase: 'before', type: 'open', target: 'popup', options: options, present: true });
 				if (eventData.isCancelled === true) return;			
 				// check if size changed
+				w2popup.status = 'opening';
 				if (typeof old_options == 'undefined' || old_options['width'] != options['width'] || old_options['height'] != options['height']) {
 					$('#w2ui-panel').remove();
 					w2popup.resize(options.width, options.height);
@@ -210,8 +219,8 @@ var w2popup = {};
 				if (body.length > 0) body[0].style.cssText = options.style;
 				$('#w2ui-popup .w2ui-msg-buttons').html(options.buttons);
 				$('#w2ui-popup .w2ui-msg-title').html(
-					  (options.showClose ? '<div class="w2ui-msg-button w2ui-msg-close" onclick="w2popup.close()">Close</div>' : '')+ 
-					  (options.showMax ? '<div class="w2ui-msg-button w2ui-msg-max" onclick="w2popup.max()">Max</div>' : '') + 
+					  (options.showClose ? '<div class="w2ui-msg-button w2ui-msg-close" onmousedown="event.stopPropagation()" onclick="w2popup.close()">Close</div>' : '')+ 
+					  (options.showMax ? '<div class="w2ui-msg-button w2ui-msg-max" onmousedown="event.stopPropagation()" onclick="w2popup.max()">Max</div>' : '') + 
 					  options.title);
 				// transition
 				var div_old = $('#w2ui-popup .w2ui-box1')[0];
@@ -224,6 +233,7 @@ var w2popup = {};
 				$('#w2ui-popup').data('prev-size', null);
 				// call event onChange
 				setTimeout(function () {
+					w2popup.status = 'open';
 					obj.trigger($.extend(eventData, { phase: 'after' }));
 				}, 1);
 			}		
@@ -235,25 +245,24 @@ var w2popup = {};
 			if (options.keyboard) $(document).on('keydown', this.keydown);
 
 			// initialize move
-			var tmp = { resizing: false };
-			$('#w2ui-popup .w2ui-msg-title')
-				.on('mousedown', function (event) { mvStart(event); })
-				.on('mousemove', function (event) { mvMove(event); })
-				.on('mouseup',   function (event) { mvStop(event); });
-			$('#w2ui-popup .w2ui-msg-body')
-				.on('mousemove', function (event) { mvMove(event); })
-				.on('mouseup',   function (event) { mvStop(event); });
-			$('#w2ui-lock')
-				.on('mousemove', function (event) { mvMove(event); })
-				.on('mouseup',   function (event) { mvStop(event); });
+			var tmp = { 
+				resizing: false,
+				mvMove	: mvMove,
+				mvStop	: mvStop
+			};
+			$('#w2ui-popup .w2ui-msg-title').on('mousedown', function (event) { mvStart(event); })
 
 			// handlers
 			function mvStart(event) {
 				if (!event) event = window.event;
 				if (!window.addEventListener) { window.document.attachEvent('onselectstart', function() { return false; } ); }
+				w2popup.status = 'moving';
 				tmp.resizing = true;
 				tmp.tmp_x = event.screenX;
 				tmp.tmp_y = event.screenY;
+				w2popup.lock({ opacity: 0 });
+				$(document).on('mousemove', tmp.mvMove);
+				$(document).on('mouseup', tmp.mvStop);
 				if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;
 				if (event.preventDefault) event.preventDefault(); else return false;
 			}
@@ -288,6 +297,7 @@ var w2popup = {};
 			function mvStop(evnt) {
 				if (tmp.resizing != true) return;
 				if (!evnt) evnt = window.event;
+				w2popup.status = 'open';
 				tmp.tmp_div_x = (evnt.screenX - tmp.tmp_x); 
 				tmp.tmp_div_y = (evnt.screenY - tmp.tmp_y); 			
 				$('#w2ui-popup').css({
@@ -315,6 +325,9 @@ var w2popup = {};
 					'top':	(parseInt($('#w2ui-panel').css('top'))  + parseInt(tmp.tmp_div_y)) + 'px'
 				});
 				tmp.resizing = false;
+				$(document).off('mousemove', tmp.mvMove);
+				$(document).off('mouseup', tmp.mvStop);
+				w2popup.unlock();
 			}		
 			return this;		
 		},
@@ -323,7 +336,7 @@ var w2popup = {};
 			var options = $('#w2ui-popup').data('options');
 			if (!options.keyboard) return;
 			// trigger event
-			var eventData = w2popup.trigger({ phase: 'before', type: 'keydown', target: 'popup', options: options, object: w2popup, originalEvent: event });
+			var eventData = w2popup.trigger({ phase: 'before', type: 'keydown', target: 'popup', options: options, originalEvent: event });
 			if (eventData.isCancelled === true) return;
 			// default behavior
 			switch (event.keyCode) {
@@ -339,10 +352,12 @@ var w2popup = {};
 		close: function (options) {
 			var obj = this;
 			var options = $.extend({}, $('#w2ui-popup').data('options'), options);
+			if ($('#w2ui-popup').length == 0) return;
 			// trigger event
 			var eventData = this.trigger({ phase: 'before', type: 'close', target: 'popup', options: options });
 			if (eventData.isCancelled === true) return;
 			// default behavior
+			w2popup.status = 'closing';
 			$('#w2ui-popup, #w2ui-panel').css({ 
 				'-webkit-transition': options.speed +'s opacity, '+ options.speed +'s -webkit-transform', 
 				'-webkit-transform': 'scale(0.9)',
@@ -358,6 +373,7 @@ var w2popup = {};
 			setTimeout(function () {
 				$('#w2ui-popup').remove();
 				$('#w2ui-panel').remove();
+				w2popup.status = 'closed';
 				// event after
 				obj.trigger($.extend(eventData, { phase: 'after'}));
 			}, options.speed * 1000);				
@@ -379,12 +395,14 @@ var w2popup = {};
 			// trigger event
 			var eventData = this.trigger({ phase: 'before', type: 'max', target: 'popup', options: options });
 			if (eventData.isCancelled === true) return;
+			w2popup.status = 'resizing';
 			// default behavior
 			options.maximized = true;
 			options.prevSize  = $('#w2ui-popup').css('width')+':'+$('#w2ui-popup').css('height');
 			$('#w2ui-popup').data('options', options);
 			// do resize
 			w2popup.resize(10000, 10000, function () {
+				w2popup.status = 'open';
 				obj.trigger($.extend(eventData, { phase: 'after'}));
 			});
 		},
@@ -397,12 +415,14 @@ var w2popup = {};
 			// trigger event
 			var eventData = this.trigger({ phase: 'before', type: 'min', target: 'popup', options: options });
 			if (eventData.isCancelled === true) return;
+			w2popup.status = 'resizing';
 			// default behavior
 			options.maximized = false;
 			options.prevSize  = null;
 			$('#w2ui-popup').data('options', options);
 			// do resize
 			w2popup.resize(size[0], size[1], function () {
+				w2popup.status = 'open';
 				obj.trigger($.extend(eventData, { phase: 'after'}));
 			});
 		},
@@ -426,6 +446,7 @@ var w2popup = {};
 		},
 		
 		load: function (options) {
+			w2popup.status = 'loading';
 			if (String(options.url) == 'undefined') {
 				console.log('ERROR: The url parameter is empty.');
 				return;
@@ -638,15 +659,15 @@ var w2popup = {};
 
 var w2alert = function (msg, title, callBack) {
 	if (typeof title == 'undefined') title = w2utils.lang('Notification');
-	if ($('#w2ui-popup').length > 0) {
+	if ($('#w2ui-popup').length > 0 && w2popup.status != 'closing') {
 		w2popup.message({
 			width 	: 400,
 			height 	: 150,
-			html 	: '<div style="position: absolute; top: 0px; left: 0px; right: 0px; bottom: 40px; overflow: auto">'+
-					  '		<div class="w2ui-centered"><div style="font-size: 13px;">'+ msg +'</div></div>'+
+			html 	: '<div style="position: absolute; top: 0px; left: 0px; right: 0px; bottom: 45px; overflow: auto">'+
+					  '		<div class="w2ui-centered" style="font-size: 13px;">'+ msg +'</div>'+
 					  '</div>'+
 					  '<div style="position: absolute; bottom: 7px; left: 0px; right: 0px; text-align: center; padding: 5px">'+
-					  '		<input type="button" value="Ok" onclick="w2popup.message();" class="w2ui-popup-button">'+
+					  '		<button onclick="w2popup.message();" class="w2ui-popup-btn btn">'+ w2utils.lang('Ok') +'</button>'+
 					  '</div>',
 			onClose : function () { 
 				if (typeof callBack == 'function') callBack(); 
@@ -658,8 +679,8 @@ var w2alert = function (msg, title, callBack) {
 			height 	: 200,
 			showMax : false,
 			title 	: title,
-			body    : '<div class="w2ui-centered"><div style="font-size: 13px;">' + msg +'</div></div>',
-			buttons : '<input type="button" value="'+ w2utils.lang('Ok') +'" class="w2ui-popup-button" onclick="w2popup.close();">',
+			body    : '<div class="w2ui-centered" style="font-size: 13px;">' + msg +'</div>',
+			buttons : '<button onclick="w2popup.close();" class="w2ui-popup-btn btn">'+ w2utils.lang('Ok') +'</button>',
 			onClose : function () { 
 				if (typeof callBack == 'function') callBack(); 
 			} 
@@ -675,19 +696,19 @@ var w2confirm = function (msg, title, callBack) {
 	if (typeof title == 'undefined') {
 		title = w2utils.lang('Confirmation');
 	}
-	if ($('#w2ui-popup').length > 0) {
+	if ($('#w2ui-popup').length > 0 && w2popup.status != 'closing') {
 		w2popup.message({
 			width 	: 400,
 			height 	: 150,
 			html 	: '<div style="position: absolute; top: 0px; left: 0px; right: 0px; bottom: 40px; overflow: auto">'+
-					  '		<div class="w2ui-centered"><div style="font-size: 13px;">'+ msg +'</div></div>'+
+					  '		<div class="w2ui-centered" style="font-size: 13px;">'+ msg +'</div>'+
 					  '</div>'+
 					  '<div style="position: absolute; bottom: 7px; left: 0px; right: 0px; text-align: center; padding: 5px">'+
-					  '		<input id="No" type="button" value="'+ w2utils.lang('No') +'" class="w2ui-popup-button">'+
-					  '		<input id="Yes" type="button" value="'+ w2utils.lang('Yes') +'" class="w2ui-popup-button">'+
+					  '		<button id="No" class="w2ui-popup-btn btn">'+ w2utils.lang('No') +'</button>'+
+					  '		<button id="Yes" class="w2ui-popup-btn btn">'+ w2utils.lang('Yes') +'</button>'+
 					  '</div>',
 			onOpen: function () {
-				$('#w2ui-popup .w2ui-popup-message .w2ui-popup-button').on('click', function (event) {
+				$('#w2ui-popup .w2ui-popup-message .btn').on('click', function (event) {
 					w2popup.message();
 					if (typeof callBack == 'function') callBack(event.target.id);
 				});
@@ -712,12 +733,12 @@ var w2confirm = function (msg, title, callBack) {
 			title   	: title,
 			modal		: true,
 			showClose	: false,
-			body    	: '<div class="w2ui-centered"><div style="font-size: 13px;">' + msg +'</div></div>',
-			buttons 	: '<input id="No" type="button" value="'+ w2utils.lang('No') +'" class="w2ui-popup-button">'+
-					  	  '<input id="Yes" type="button" value="'+ w2utils.lang('Yes') +'" class="w2ui-popup-button">',
+			body		: '<div class="w2ui-centered" style="font-size: 13px;">' + msg +'</div>',
+			buttons		: '<button id="No" class="w2ui-popup-btn btn">'+ w2utils.lang('No') +'</button>'+
+						  '<button id="Yes" class="w2ui-popup-btn btn">'+ w2utils.lang('Yes') +'</button>',
 			onOpen: function (event) {
 				event.onComplete = function () {
-					$('#w2ui-popup .w2ui-popup-button').on('click', function (event) {
+					$('#w2ui-popup .w2ui-popup-btn').on('click', function (event) {
 						w2popup.close();
 						if (typeof callBack == 'function') callBack(event.target.id);
 					});
