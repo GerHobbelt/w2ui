@@ -433,12 +433,7 @@
 				if (nd.nodes.length > 0) obj.toggle(obj.selected);
 			}
 			if (event.keyCode == 37) { // left
-				if (nd.nodes.length > 0 && nd.expanded) {
-					obj.collapse(obj.selected);
-				} else {
-					selectNode(nd.parent);
-					if (!nd.parent.group) obj.collapse(nd.parent.id);
-				}
+				if (nd.nodes.length > 0 && nd.expanded) obj.collapse(obj.selected); else selectNode(nd.parent);
 			}
 			if (event.keyCode == 39) { // right
 				if ((nd.nodes.length > 0 || nd.plus) && !nd.expanded) obj.expand(obj.selected);
