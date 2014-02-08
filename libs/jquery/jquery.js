@@ -8589,7 +8589,14 @@ jQuery.ajaxTransport(function( options ) {
 								complete(
 									// file protocol always yields status 0, assume 404
 									xhr.status || 404,
-									xhr.statusText
+									xhr.statusText,
+									// Support: IE9
+									// #11426: When requesting binary data, IE9 will throw an exception
+									// on any attempt to access responseText
+									typeof xhr.responseText === "string" ? {
+										text: xhr.responseText
+									} : undefined,
+									xhr.getAllResponseHeaders()
 								);
 							} else {
 								complete(
