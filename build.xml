@@ -121,13 +121,13 @@
 
 		<!-- Compile w2ui-fields.less files -->
 		<echo message="LESS: src/less/w2ui-fields.less ==> dist/w2ui-fields.css"/>
-		<exec executable="lessc" osfamily="unix">
+		<exec executable="node_modules/.bin/lessc" osfamily="unix">
 			<arg value="src/less/w2ui-fields.less"/>
 			<arg value="dist/w2ui-fields.css"/>
 		</exec>
 		<exec executable="cmd" osfamily="windows">
 		  <arg value="/c"/>
-		  <arg value="lessc"/>
+		  <arg value="node_modules/.bin/lessc"/>
 		  <arg value="src/less/w2ui-fields.less"/>
 		  <arg value="dist/w2ui-fields.css"/>
 		</exec>
@@ -139,7 +139,7 @@
 		</exec>
 		<exec executable="cmd" output="dist/w2ui-fields.min.css" osfamily="windows">
 		  <arg value="/c"/>
-		  <arg value="lessc"/>
+		  <arg value="node_modules/.bin/lessc"/>
 		  <arg value="dist/w2ui-fields.css"/>
 		</exec>
 
