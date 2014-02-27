@@ -270,6 +270,12 @@
 	}
 }
 
+.w2ui-select {
+	cursor: default;
+	color: black !important;
+	.linear-gradient(top, #ffffff 20%, #f6f6f6 50%, #eeeeee 52%, #f4f4f4 100%);
+}
+
 /*
 *	Drop down menu
 */
@@ -328,9 +334,9 @@
 		li {
 			float: left;
 			margin: 2px 1px 0px 2px;
-			border-radius: 10px;
+			border-radius: 3px;
 			width: auto;
-			padding: 2px 12px 1px 10px;
+			padding: 3px 10px 1px 7px;
 			border: @list-item-border;
 			background-color: @list-item-background-color;
 			white-space: nowrap;
@@ -338,7 +344,7 @@
 			font-family: @list-item-font;
 			font-size: @list-item-font-size;
 			line-height: 100%;
-			height: 18px;
+			height: 20px;
 			overflow: hidden;
 			text-overflow: ellipsis;
 			.box-sizing;
@@ -353,6 +359,7 @@
 				background-color: transparent;
 				input {
 					padding: 1px;
+					padding-top: 0px;
 					margin: 0px;
 					border: 0px;
 					outline: none;
@@ -368,7 +375,7 @@
 				float: right;
 				width: 15px;
 				height: 14px;
-				margin: -1px -9px 0px 5px;
+				margin: -1px -9px 0px 3px;
 				border-radius: 15px;
 				&:hover {
 					background-color: #D77F7F;

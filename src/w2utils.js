@@ -36,6 +36,7 @@ var w2obj = w2obj || {}; // expose object to be able to overwrite default functi
 *	- improoved overlays (better positioning, refresh, etc.)
 *	- multiple overlay at the same time (if it has name)
 *	- overlay options.css removed, I have added options.style 
+*	- ability to open searchable w2menu
 *
 ************************************************/
 
@@ -190,8 +191,10 @@ var w2utils = (function () {
 		var sec = (d2.getTime() - d1.getTime()) / 1000;
 		var amount = '';
 		var type   = '';
-		
-		if (sec < 60) {
+		if (sec < 0) {
+			amount = '<span style="color: #aaa">future</span>';
+			type   = '';
+		} else if (sec < 60) {
 			amount = Math.floor(sec);
 			type   = 'sec';
 			if (sec < 0) { amount = 0; type = 'sec' }
@@ -490,8 +493,8 @@ var w2utils = (function () {
 				$(div_new).show();
 				// -- need a timing function because otherwise not working
 				window.setTimeout(function() {
-					div_new.style.cssText += cross('transition', time+'s linear') +';'+ cross('transform', 'translate3d(0, 0, 0)', 'translate(0, 0)');
-					div_old.style.cssText += cross('transition', time+'s linear') +';'+ cross('transform', 'translate3d(-'+ width +'px, 0, 0)', 'translate(-'+ width +'px, 0)');
+					div_new.style.cssText += cross('transition', time+'s') +';'+ cross('transform', 'translate3d(0, 0, 0)', 'translate(0, 0)');
+					div_old.style.cssText += cross('transition', time+'s') +';'+ cross('transform', 'translate3d(-'+ width +'px, 0, 0)', 'translate(-'+ width +'px, 0)');
 				}, 1);
 				break;
 
@@ -502,8 +505,8 @@ var w2utils = (function () {
 				$(div_new).show();
 				// -- need a timing function because otherwise not working
 				window.setTimeout(function() {
-					div_new.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'translate3d(0px, 0, 0)', 'translate(0px, 0)');
-					div_old.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'translate3d('+ width +'px, 0, 0)', 'translate('+ width +'px, 0)');
+					div_new.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'translate3d(0px, 0, 0)', 'translate(0px, 0)');
+					div_old.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'translate3d('+ width +'px, 0, 0)', 'translate('+ width +'px, 0)');
 				}, 1);
 				break;
 
@@ -514,8 +517,8 @@ var w2utils = (function () {
 				$(div_new).show();
 				// -- need a timing function because otherwise not working
 				window.setTimeout(function() {
-					div_new.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'translate3d(0, 0, 0)', 'translate(0, 0)');
-					div_old.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'translate3d(0, '+ height +'px, 0)', 'translate(0, '+ height +'px)');
+					div_new.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'translate3d(0, 0, 0)', 'translate(0, 0)');
+					div_old.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'translate3d(0, '+ height +'px, 0)', 'translate(0, '+ height +'px)');
 				}, 1);
 				break;
 
@@ -526,20 +529,20 @@ var w2utils = (function () {
 				$(div_new).show();
 				// -- need a timing function because otherwise not working
 				window.setTimeout(function() {
-					div_new.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'translate3d(0, 0, 0)', 'translate(0, 0)');
-					div_old.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'translate3d(0, 0, 0)', 'translate(0, 0)');
+					div_new.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'translate3d(0, 0, 0)', 'translate(0, 0)');
+					div_old.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'translate3d(0, 0, 0)', 'translate(0, 0)');
 				}, 1);
 				break;
 
 			case 'flip-left':
 				// init divs
-				div_old.style.cssText += 'overflow: hidden; '+ cross('-transform', 'rotateY(0deg)');
+				div_old.style.cssText += 'overflow: hidden; '+ cross('transform', 'rotateY(0deg)');
 				div_new.style.cssText += 'overflow: hidden; '+ cross('transform', 'rotateY(-180deg)');
 				$(div_new).show();
 				// -- need a timing function because otherwise not working
 				window.setTimeout(function() {
-					div_new.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'rotateY(0deg)');
-					div_old.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'rotateY(180deg)');
+					div_new.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'rotateY(0deg)');
+					div_old.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'rotateY(180deg)');
 				}, 1);
 				break;
 
@@ -550,8 +553,8 @@ var w2utils = (function () {
 				$(div_new).show();
 				// -- need a timing function because otherwise not working
 				window.setTimeout(function() {
-					div_new.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'rotateY(0deg)');
-					div_old.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'rotateY(-180deg)');
+					div_new.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'rotateY(0deg)');
+					div_old.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'rotateY(-180deg)');
 				}, 1);
 				break;
 
@@ -562,8 +565,8 @@ var w2utils = (function () {
 				$(div_new).show();
 				// -- need a timing function because otherwise not working
 				window.setTimeout(function() {
-					div_new.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'rotateX(0deg)');
-					div_old.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'rotateX(-180deg)');
+					div_new.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'rotateX(0deg)');
+					div_old.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'rotateX(-180deg)');
 				}, 1);
 				break;
 
@@ -574,8 +577,8 @@ var w2utils = (function () {
 				$(div_new).show();
 				// -- need a timing function because otherwise not working
 				window.setTimeout(function() {
-					div_new.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'rotateX(0deg)');
-					div_old.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'rotateX(180deg)');
+					div_new.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'rotateX(0deg)');
+					div_old.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'rotateX(180deg)');
 				}, 1);
 				break;
 
@@ -586,8 +589,8 @@ var w2utils = (function () {
 				$(div_new).show();
 				// -- need a timing function because otherwise not working
 				window.setTimeout(function() {
-					div_new.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'scale(1)') +'; opacity: 1;';
-					div_old.style.cssText += cross('transition', time+'s linear') +';';
+					div_new.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'scale(1)') +'; opacity: 1;';
+					div_old.style.cssText += cross('transition', time+'s') +';';
 				}, 1);
 				break;
 
@@ -598,8 +601,8 @@ var w2utils = (function () {
 				$(div_new).show();
 				// -- need a timing function because otherwise not working
 				window.setTimeout(function() {
-					div_new.style.cssText += cross('transition', time+'s linear') +'; opacity: 1;';
-					div_old.style.cssText += cross('transition', time+'s linear') +'; '+ cross('transform', 'scale(1.7)') +'; opacity: 0;';
+					div_new.style.cssText += cross('transition', time+'s') +'; opacity: 1;';
+					div_old.style.cssText += cross('transition', time+'s') +'; '+ cross('transform', 'scale(1.7)') +'; opacity: 0;';
 				}, 1);
 				break;
 
@@ -610,8 +613,8 @@ var w2utils = (function () {
 				$(div_new).show();
 				// -- need a timing function because otherwise not working
 				window.setTimeout(function() {
-					div_new.style.cssText += cross('transition', time +'s linear') +'; opacity: 1;';
-					div_old.style.cssText += cross('transition', time +'s linear');
+					div_new.style.cssText += cross('transition', time +'s') +'; opacity: 1;';
+					div_old.style.cssText += cross('transition', time +'s');
 				}, 1);
 				break;
 		}
@@ -740,31 +743,32 @@ var w2utils = (function () {
 	}
 
 	function getSize (el, type) {
+		var $el = $(el);
 		var bwidth = {
-			left: 	parseInt($(el).css('border-left-width')) || 0,
-			right:  parseInt($(el).css('border-right-width')) || 0,
-			top:  	parseInt($(el).css('border-top-width')) || 0,
-			bottom: parseInt($(el).css('border-bottom-width')) || 0
+			left: 	parseInt($el.css('border-left-width')) || 0,
+			right:  parseInt($el.css('border-right-width')) || 0,
+			top:  	parseInt($el.css('border-top-width')) || 0,
+			bottom: parseInt($el.css('border-bottom-width')) || 0
 		};
 		var mwidth = {
-			left: 	parseInt($(el).css('margin-left')) || 0,
-			right:  parseInt($(el).css('margin-right')) || 0,
-			top:  	parseInt($(el).css('margin-top')) || 0,
-			bottom: parseInt($(el).css('margin-bottom')) || 0
+			left: 	parseInt($el.css('margin-left')) || 0,
+			right:  parseInt($el.css('margin-right')) || 0,
+			top:  	parseInt($el.css('margin-top')) || 0,
+			bottom: parseInt($el.css('margin-bottom')) || 0
 		};
 		var pwidth = {
-			left: 	parseInt($(el).css('padding-left')) || 0,
-			right:  parseInt($(el).css('padding-right')) || 0,
-			top:  	parseInt($(el).css('padding-top')) || 0,
-			bottom: parseInt($(el).css('padding-bottom')) || 0
+			left: 	parseInt($el.css('padding-left')) || 0,
+			right:  parseInt($el.css('padding-right')) || 0,
+			top:  	parseInt($el.css('padding-top')) || 0,
+			bottom: parseInt($el.css('padding-bottom')) || 0
 		};
 		switch (type) {
-			case 'top': 	return bwidth.top + mwidth.top + pwidth.top; 
-			case 'bottom': 	return bwidth.bottom + mwidth.bottom + pwidth.bottom; 
-			case 'left': 	return bwidth.left + mwidth.left + pwidth.left; 
-			case 'right': 	return bwidth.right + mwidth.right + pwidth.right; 
-			case 'width': 	return bwidth.left + bwidth.right + mwidth.left + mwidth.right + pwidth.left + pwidth.right + parseInt($(el).width()); 
-			case 'height': 	return bwidth.top + bwidth.bottom + mwidth.top + mwidth.bottom + pwidth.top + pwidth.bottom + parseInt($(el).height());
+			case 'top': 	return bwidth.top + mwidth.top + pwidth.top;
+			case 'bottom': 	return bwidth.bottom + mwidth.bottom + pwidth.bottom;
+			case 'left': 	return bwidth.left + mwidth.left + pwidth.left;
+			case 'right': 	return bwidth.right + mwidth.right + pwidth.right;
+			case 'width': 	return bwidth.left + bwidth.right + mwidth.left + mwidth.right + pwidth.left + pwidth.right + parseInt($el.width());
+			case 'height': 	return bwidth.top + bwidth.bottom + mwidth.top + mwidth.bottom + pwidth.top + pwidth.bottom + parseInt($el.height());
 			case '+width': 	return bwidth.left + bwidth.right + mwidth.left + mwidth.right + pwidth.left + pwidth.right; 
 			case '+height': return bwidth.top + bwidth.bottom + mwidth.top + mwidth.bottom + pwidth.top + pwidth.bottom;
 		}
@@ -967,7 +971,8 @@ w2utils.keyboard = (function (obj) {
 		var tag = event.target.tagName;
 		var obj = $(event.target).parents('.w2ui-reset');
 		if (obj.length > 0) {
-			w2ui_name = obj.attr('name');
+			var name = obj.attr('name');
+			if (w2ui[name] && w2ui[name].keyboard) w2ui_name = name;
 		}
 	}
 
@@ -1091,10 +1096,10 @@ w2utils.keyboard = (function (obj) {
 					// monitor if moved
 					if ($('#w2ui-tag-'+tagID).data('position') != ($(el).offset().left + el.offsetWidth) + 'x' + $(el).offset().top) {
 						$('#w2ui-tag-'+tagID).css({
-							'-webkit-transition': '.2s linear',
-							'-moz-transition'	: '.2s linear',
-							'-ms-transition'	: '.2s linear',
-							'-o-transition'		: '.2s linear',
+							'-webkit-transition': '.2s',
+							'-moz-transition'	: '.2s',
+							'-ms-transition'	: '.2s',
+							'-o-transition'		: '.2s',
 							left: ($(el).offset().left + el.offsetWidth) + 'px',
 							top: $(el).offset().top + 'px'
 						}).data('position', ($(el).offset().left + el.offsetWidth) + 'x' + $(el).offset().top);
@@ -1149,10 +1154,11 @@ w2utils.keyboard = (function (obj) {
 			style		: '',		// additional style for main div
 			'class'		: '',		// additional class name for main dvi
 			onShow		: null, 	// event on show
-			onHide		: null		// event on hide
+			onHide		: null,		// event on hide
+			tmp			: {}
 		}
 		if (!$.isPlainObject(options)) options = {};
-		options = $.extend(true, {}, defaults, options);
+		options = $.extend({}, defaults, options);
 		if (options.name) name = '-' + options.name;
 		// if empty then hide
 		if (this.length == 0 || html == '' || typeof html == 'undefined') { 
@@ -1179,9 +1185,10 @@ w2utils.keyboard = (function (obj) {
 		var bc  = div2.css('background-color'); 
 		if (typeof bc != 'undefined' &&	bc != 'rgba(0, 0, 0, 0)' && bc != 'transparent') div1.css('background-color', bc);
 
-		div1.data('obj', obj)
+		div1.data('element', obj.length > 0 ? obj[0] : null)
 			.data('hide', hide)
 			.data('fixSize', fixSize)
+			.data('position', $(obj).offset().left + 'x' + $(obj).offset().top)
 			.fadeIn('fast').on('mousedown', function (event) { 
 				$('#w2ui-overlay'+ name).data('keepOpen', true); 
 				if (['INPUT', 'TEXTAREA', 'SELECT'].indexOf(event.target.tagName) === -1) event.preventDefault(); 
@@ -1194,7 +1201,22 @@ w2utils.keyboard = (function (obj) {
 			$(document).off('click', hide).on('click', hide);
 			if (typeof options.onShow == 'function') options.onShow();
 		}, 10);
+
+		monitor();
 		return $(this);
+
+		// monitor position
+		function monitor() {
+			var tmp = $('#w2ui-overlay'+ name);
+			if (tmp.data('element') != obj[0]) return; // it if it different overlay
+			if (tmp.length == 0) return;
+			var pos = $(obj).offset().left + 'x' + $(obj).offset().top;
+			if (tmp.data('position') != pos) {
+				hide();
+			} else {
+				setTimeout(monitor, 250);
+			}
+		}
 
 		// click anywhere else hides the drop down
 		function hide () {
@@ -1224,11 +1246,30 @@ w2utils.keyboard = (function (obj) {
 				var w = div2.width();
 				if (options.width && options.width < w) w = options.width;
 				if (w < 30) w = 30;
+				// if content of specific height
+				if (options.tmp.contentHeight) {
+					h = options.tmp.contentHeight;
+					div2.height(h);
+					setTimeout(function () {
+						if (div2.height() > div2.find('div.menu > table').height()) {
+							div2.find('div.menu').css('overflow-y', 'hidden');
+						}
+					}, 1);
+				}
+				if (options.tmp.contentWidth) {
+					w = options.tmp.contentWidth;
+					div2.width(w);
+					setTimeout(function () {
+						if (div2.width() > div2.find('div.menu > table').width()) {
+							div2.find('div.menu').css('overflow-x', 'hidden');
+						}
+					}, 1);
+				}
 				// alignment
 				switch(options.align) {
 					case 'both':
 						options.left = 17;
-						options.width = w2utils.getSize($(obj), 'width');
+						if (options.width == 0)	options.width = w2utils.getSize($(obj), 'width');
 						break;
 					case 'left':
 						options.left = 17;
@@ -1243,7 +1284,7 @@ w2utils.keyboard = (function (obj) {
 				var boxLeft  = options.left;
 				var boxWidth = options.width;
 				var tipLeft  = options.tipLeft;
-				if (w == 30) boxWidth = 30; else boxWidth = (options.width ? options.width : 'auto');
+				if (w == 30 && !boxWidth) boxWidth = 30; else boxWidth = (options.width ? options.width : 'auto');
 				if (tmp < 25) {
 					boxLeft = 25 - tmp;
 					tipLeft = Math.floor(tmp);
@@ -1258,7 +1299,7 @@ w2utils.keyboard = (function (obj) {
 				// $(window).height() - has a problem in FF20
 				var maxHeight = window.innerHeight + $(document).scrollTop() - div2.offset().top - 7;
 				var maxWidth  = window.innerWidth + $(document).scrollLeft() - div2.offset().left - 7;
-				if (maxHeight > -30 && maxHeight < 210) {
+				if (maxHeight > -50 && maxHeight < 210) {
 					// show on top
 					maxHeight = div2.offset().top - $(document).scrollTop() - 7;
 					if (options.maxHeight && maxHeight > options.maxHeight) maxHeight = options.maxHeight;
@@ -1313,15 +1354,19 @@ w2utils.keyboard = (function (obj) {
 			index		: null, 	// current selected
 			items 		: [],
 			render		: null,
-			onSelect 	: null
+			onSelect 	: null,
+			tmp			: {}
 		}
+		var obj  = this;
 		var name = '';
 		if (menu == 'refresh') {
 			// if not show - call blur
 			if ($('#w2ui-overlay'+ name).length > 0) {
-				$('#w2ui-overlay'+ name +' > div').html(getMenuHTML(), options);
-				var fun = $('#w2ui-overlay'+ name).data('fixSize');
-				if (typeof fun == 'function') fun();
+				options = $.extend($.fn.w2menuOptions, options);
+				var scrTop = $('#w2ui-overlay'+ name +' div.menu').scrollTop();
+				$('#w2ui-overlay'+ name +' div.menu').html(getMenuHTML());
+				$('#w2ui-overlay'+ name +' div.menu').scrollTop(scrTop);
+				fixSize();
 			} else {
 				$(this).w2menu(options);
 			}
@@ -1329,23 +1374,139 @@ w2utils.keyboard = (function (obj) {
 			if (arguments.length == 1) options = menu; else options.items = menu;
 			if (typeof options != 'object') options = {};
 			options = $.extend({}, defaults, options);
+			$.fn.w2menuOptions = options;
 			if (options.name) name = '-' + options.name;
 			if (typeof options.select == 'function' && typeof options.onSelect != 'function') options.onSelect = options.select;
 			if (typeof options.onRender == 'function' && typeof options.render != 'function') options.render = options.onRender;
 			// since only one overlay can exist at a time
 			$.fn.w2menuHandler = function (event, index) {
 				if (typeof options.onSelect == 'function') {
-					options.onSelect({
-						index	: index,
-						item	: options.items[index],
-						originalEvent: event
-					}); 
+					// need time so that menu first hides
+					setTimeout(function () {
+						options.onSelect({
+							index	: index,
+							item	: options.items[index],
+							originalEvent: event
+						}); 
+					}, 10);
 				}
 			};
-			return $(this).w2overlay(getMenuHTML(), options);
+			var html = '';
+			if (options.search) {
+				html += 
+					'<div style="position: absolute; top: 0px; height: 40px; left: 0px; right: 0px; border-bottom: 1px solid silver; background-color: #ECECEC; padding: 8px 5px;">'+
+					'	<div class="w2ui-icon icon-search" style="position: absolute; margin-top: 4px; margin-left: 6px; width: 11px; background-position: left !important;"></div>'+
+					'	<input id="menu-search" type="text" style="width: 100%; outline: none; padding-left: 20px;" onclick="event.stopPropagation();">'+
+					'</div>';
+				options.style += ';background-color: #ECECEC';
+				options.index = 0;
+				for (var i in options.items) options.items[i].hidden = false;
+			}
+			html += '<div class="menu" style="position: absolute; top: '+ (options.search ? 40 : 0) + 'px; bottom: 0px; width: 100%; overflow: auto;">' + 
+						getMenuHTML() + 
+					'</div>';
+			var ret = $(this).w2overlay(html, options);
+			$('#w2ui-overlay'+ name +' #menu-search')
+				.on('keyup', change)
+				.on('keydown', function (event) {
+					// cancel tab key
+					if (event.keyCode == 9) { event.stopPropagation(); event.preventDefault(); }
+				});				
+			fixSize();
+			return ret;
+		}
+
+		function fixSize() {
+			setTimeout(function () { 
+				// show selected
+				$('#w2ui-overlay'+ name +' tr.w2ui-selected').removeClass('w2ui-selected');
+				var cur 	= $('#w2ui-overlay'+ name +' tr[index='+ options.index +']');
+				var scrTop 	= $('#w2ui-overlay'+ name +' div.menu').scrollTop();
+				cur.addClass('w2ui-selected');
+				if (options.tmp) options.tmp.contentHeight = $('#w2ui-overlay'+ name +' table').height() + (options.search ? 50 : 10);
+				if (options.tmp) options.tmp.contentWidth  = $('#w2ui-overlay'+ name +' table').width();
+				var tmp = $('#w2ui-overlay'+ name).data('fixSize');
+				if (typeof tmp == 'function') tmp();
+				// scroll into view
+				if (cur.length > 0) {
+					var top  	= cur[0].offsetTop - 5; // 5 is margin top
+					var el 		= $('#w2ui-overlay'+ name +' div.menu');
+					var height 	= el.height();
+					$('#w2ui-overlay'+ name +' div.menu').scrollTop(scrTop);
+					if (top < scrTop || top + cur.height() > scrTop + height) {
+						$('#w2ui-overlay'+ name +' div.menu').animate({ 'scrollTop': top - (height - cur.height() * 2) / 2 }, 200, 'linear');
+					}
+				}				
+			}, 1);			
+		}
+
+		function change(event) {
+			var search	= this.value;
+			var key 	= event.keyCode;
+			var cancel  = false;
+			switch(key) {
+				case 13: // enter
+					$('#w2ui-overlay'+ name).remove();
+					$.fn.w2menuHandler(event, options.index);
+					break;
+				case 27: // escape
+					$('#w2ui-overlay'+ name).remove();
+					$.fn.w2menuHandler(event, -1);
+					break;
+				case 38: // up
+					options.index = w2utils.isInt(options.index) ? parseInt(options.index) : 0;
+					options.index--;
+					while (options.index > 0 && options.items[options.index].hidden) options.index--;
+					if (options.index == 0 && options.items[options.index].hidden) {
+						while (options.items[options.index] && options.items[options.index].hidden) options.index++;
+					}
+					if (options.index < 0) options.index = 0;
+					cancel = true;
+					break;
+				case 40: // down
+					options.index = w2utils.isInt(options.index) ? parseInt(options.index) : 0;
+					options.index++;
+					while (options.index < options.items.length-1 && options.items[options.index].hidden) options.index++;
+					if (options.index == options.items.length-1 && options.items[options.index].hidden) {
+						while (options.items[options.index] && options.items[options.index].hidden) options.index--;
+					}
+					if (options.index >= options.items.length) options.index = options.items.length - 1;
+					cancel = true;
+					break;
+			}		
+			// filter
+			if (!cancel) {
+				var shown  = 0;
+				for (var i in options.items) {
+					var item = options.items[i];
+					var prefix = '';
+					var suffix = '';
+					if (['is', 'begins with'].indexOf(options.match) != -1) prefix = '^';
+					if (['is', 'ends with'].indexOf(options.match) != -1) suffix = '$';
+					try { 
+						var re = new RegExp(prefix + search + suffix, 'i');
+						if (re.test(item.text) || item.text == '...') item.hidden = false; else item.hidden = true; 
+						if (options.applyFilter !== true) item.hidden = false; 
+					} catch (e) {}
+					// do not show selected items
+					if (obj.type == 'enum' && $.inArray(item.id, ids) != -1) item.hidden = true;
+					if (item.hidden !== true) shown++;
+				}
+				options.index = 0;
+				while (options.index < options.items.length-1 && options.items[options.index].hidden) options.index++;
+				if (shown <= 0) options.index = -1;
+			}
+			$(obj).w2menu('refresh', options);
+			fixSize();
 		}
 
 		function getMenuHTML () { 
+			if (options.spinner) {
+				return  '<table class="w2ui-drop-menu"><tr><td style="padding: 10px; text-align: center;">'+
+						'	<div class="w2ui-spinner" style="width: 18px; height: 18px; position: relative; top: 5px; left: 2px;"></div> '+
+						'	<div style="display: inline-block; padding: 5px;"> Loading...</div>'+
+						'</td></tr></table>';
+			}
 			var count		= 0;
 			var menu_html	= '<table cellspacing="0" cellpadding="0" class="w2ui-drop-menu">';
 			for (var f = 0; f < options.items.length; f++) { 
@@ -1373,10 +1534,13 @@ w2utils.keyboard = (function (obj) {
 						if (options.altRows !== true) bg = '';
 						menu_html += 
 							'<tr index="'+ f + '" style="'+ (mitem.style ? mitem.style : '') +'" '+
-							'		class="'+ bg +' '+ (options.index == count ? 'w2ui-selected' : '') +'"'+
-							'		onclick="$(\'#w2ui-overlay\').remove(); $.fn.w2menuHandler(event, \''+ f +'\'); event.stopPropagation();" '+
-							'		onmouseover="$(this).addClass(\'w2ui-selected\');" '+
-							'		onmouseout="$(this).removeClass(\'w2ui-selected\');">'+
+							'		class="'+ bg +' '+ (options.index == f ? 'w2ui-selected' : '') +'"'+
+							'		onclick="var obj = this; $(this).parent().find(\'tr\').removeClass(\'w2ui-selected\'); '+
+							'			$(this).addClass(\'w2ui-selected\'); event.stopPropagation();'+
+							'			setTimeout(function () {'+
+							'				$(\'#w2ui-overlay'+ name +'\').remove(); '+
+							'				$.fn.w2menuHandler(event, \''+ f +'\'); '+
+							'			}, 100);">'+
 								imgd +
 							'	<td>'+ txt +'</td>'+
 							'</tr>';
