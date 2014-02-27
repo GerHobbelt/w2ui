@@ -96,14 +96,18 @@ var w2popup = {};
 		open: function (options) {
 			var obj = this;
 			if (w2popup.status == 'closing') {
-				setTimeout(function () { obj.open.call(obj, options); }, 100);
+				setTimeout(function () { 
+					obj.open.call(obj, options); 
+				}, 100);
 				return;
 			}
 			// get old options and merge them
 			var old_options = $('#w2ui-popup').data('options');
 			var options = $.extend({}, this.defaults, { body : '' }, old_options, options, { maximized: false });
 			// need timer because popup might not be open
-			setTimeout(function () { $('#w2ui-popup').data('options', options); }, 100);
+			setTimeout(function () { 
+				$('#w2ui-popup').data('options', options); 
+			}, 100);
 			// if new - reset event handlers
 			var event_types = [
 				'max',
@@ -374,7 +378,7 @@ var w2popup = {};
 				'-o-transform': 'scale(0.9)',
 				'opacity': '0'
 			});		
-			w2popup.unlockScreen();
+			w2popup.unlockScreen(options);
 			setTimeout(function () {
 				$('#w2ui-popup').remove();
 				$('#w2ui-panel').remove();
@@ -612,9 +616,11 @@ var w2popup = {};
 			return true;
 		},
 		
-		unlockScreen: function () {
+		unlockScreen: function (options) {
 			if ($('#w2ui-lock').length == 0) return false;	
-			var options = $.extend({}, $('#w2ui-popup').data('options'), options);		
+			if (typeof options == 'undefined') options = $('#w2ui-popup').data('options');
+			if (typeof options == 'undefined') options = {};
+			options = $.extend({}, w2popup.defaults, options);
 			$('#w2ui-lock').css({ 
 				'-webkit-transition': options.speed +'s opacity', 
 				'-moz-transition': options.speed +'s opacity', 

@@ -1,0 +1,24 @@
+<div class="content">
+	<div id="example_title">
+		<h1>LockScreen</h1>
+		Locks / unlocks the screen: click the button to lock the screen (a grey overlay is shown) and click anywhere in the overlay to unlock the screen again; these are internal methods provided by the w2popup module.
+	</div>
+	<div id="example_view"></div>
+	<div id="example_code"></div>
+</div>
+
+<!--CODE-->
+<input type="button" value="Lock Screen" onclick="lockScreen();">
+
+<!--CODE-->
+function lockScreen() {
+    w2utils.lock('body', {
+    	msg: 'Locking the screen...',
+    	opacity: 0.5,
+    	spinner: true
+    });
+    var lock = $('.w2ui-lock, .w2ui-lock-msg');
+    lock.on('click', function (e) {
+    	w2utils.unlock('body');
+    });
+}

@@ -150,6 +150,11 @@ $(function () {
 					{ id: 'popup-8', text: 'Dialogs', icon: 'fa-list-alt' }
 				]
 			},
+			{ id: 'extras', text: 'Extras', img: 'icon-folder', group1: true,
+				nodes: [
+					{ id: 'lockscreen-1', text: 'Lock Screen', icon: 'fa-list-alt' }
+				]
+			},
 			{ id: 'utils', text: 'Utilities', img: 'icon-folder', group1: true,
 				nodes: [
 					{ id: 'utils-1', text: 'Validation', icon: 'fa-star-empty' },
