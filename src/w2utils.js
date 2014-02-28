@@ -846,7 +846,7 @@ w2utils.event = {
 		eventData = $.extend({}, { type: null, execute: 'before', target: null, onComplete: null }, eventData);
 	
 		if (typeof eventData.type == 'undefined') { console.log('ERROR: You must specify event type when calling .off() method of '+ this.name); return; }
-		if (typeof handler == 'undefined') { handler = null;  }
+		if (typeof handler == 'undefined') { handler = null; }
 		// remove handlers
 		var newHandlers = [];
 		for (var h in this.handlers) {
@@ -889,11 +889,11 @@ w2utils.event = {
 		}		
 		// main object events
 		var funName = 'on' + eventData.type.substr(0,1).toUpperCase() + eventData.type.substr(1);
+		var funPhasedName = 'on' + eventData.phase.substr(0,1).toUpperCase() + eventData.phase.substr(1) + eventData.type.substr(0,1).toUpperCase() + eventData.type.substr(1);
 		if (typeof this[funName] === 'function' && typeof this[funPhasedName] === 'function') {
 			alert("ERROR in Main Object: user specified both basic " + funName + " and new " + funPhasedName + " event handlers; only the latter will execute!");
 		}
 		// test for both onEvent and onBeforeEvent/onAfterEvent handlers being specified: exec the latter if both are specified.
-		var funPhasedName = 'on' + eventData.phase.substr(0,1).toUpperCase() + eventData.phase.substr(1) + eventData.type.substr(0,1).toUpperCase() + eventData.type.substr(1);
 		if ((eventData.phase == 'before' && typeof this[funName] === 'function') || typeof this[funPhasedName] === 'function') {
 			var fun = (this[funPhasedName] || this[funName]);
 			// check handler arguments
