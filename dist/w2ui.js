@@ -75,6 +75,7 @@ var w2utils = (function () {
 		formatDate		: formatDate,
 		formatTime  	: formatTime,
 		formatDateTime  : formatDateTime,
+		render 			: render,
 		stripTags		: stripTags,
 		encodeTags		: encodeTags,
 		escapeId		: escapeId,
@@ -332,6 +333,101 @@ var w2utils = (function () {
 			fmt = format.split('|');
 		}
 		return this.formatDate(dateStr, fmt[0]) + ' ' + this.formatTime(dateStr, fmt[1]);
+	}
+
+	function render(content, options) {
+		options = $.extend({}, {
+			depth: 2,
+			renderFunctions: true,	// when false, it is rendered as an empty string. when set to a string value, that string is used as the render output instead
+			renderArrays: true,	    // when false, it is rendered by joining its elements similar to .toString(). when set to a string value, that string is used as the render output instead
+			renderObjects: true,	// when false, it is rendered as an empty string. when set to a string value, that string is used as the render output instead
+			format: 'html'
+		}, options);
+
+		switch (typeof content) {
+		case 'string':
+			return content;
+
+		case 'number':
+			if (options.format !== 'json') {
+				return '' + content;
+			}
+			return content;
+
+		case 'boolean':
+			if (options.format !== 'json') {
+				return content ? 'true' : 'false';
+			}
+			return content;
+
+		case 'function':
+			if (!options.renderFunctions) {
+				return '';
+			} else if (options.renderFunctions !== true) {
+				return render((typeof options.renderFunctions === 'function' ? options.renderFunctions(content, options) : options.renderFunctions), $.extend({}, options, { format: 'string' }));
+			} else if (options.format === 'html') {
+				return '<pre class="w2utils-display-function">' + encodeTags(String(content)) + '</pre>';
+			}
+			return String(content);
+
+		default:
+		case 'object':
+			var markers = ['{', '}', '(OBJECT)', 'object'];
+			var obj, s, a, nl, s2;
+
+			if (content == null) {
+				if (options.format !== 'json') {
+					return 'null';
+				}
+				return content;
+			} else if (Array.isArray(content)) {
+				if (options.renderArrays === false) {
+					return content.join('');
+				} else if (options.renderArrays !== true) {
+					return render((typeof options.renderArrays === 'function' ? options.renderArrays(content, options) : options.renderArrays), $.extend({}, options, { format: 'string' }));
+				}
+				markers = ['[', ']', '(ARRAY)', 'array'];
+			} else {
+				if (!options.renderObjects) {
+					return '';
+				} else if (options.renderObjects !== true) {
+					return render((typeof options.renderObjects === 'function' ? options.renderObjects(content, options) : options.renderObjects), $.extend({}, options, { format: 'string' }));
+				}
+			}
+
+			if (options.depth > 0) {
+				if (options.format !== 'json') {
+					obj = [];
+					for (a in content) {
+						s = render(a, $.extend({}, options, { format: 'string', depth: 0 })); 
+						s += ': ';
+						s2 = render(content[a], $.extend({}, options, { format: 'string', depth: options.depth - 1 }));
+						s += s2.replace(/\n/g, '\n  ');
+						s = s.replace(/\n +([}\]])$/, '\n$1');
+						obj.push(s);
+					}
+					nl = (obj.length > 0 ? '\n' : '');
+					s = markers[0] + nl + obj.join('\n');
+					s = s.replace(/\n/g, '\n  ');
+					s += nl + markers[1];
+					if (options.format === 'html') {
+						return '<pre class="w2utils-display-' + markers[3] + '">' + encodeTags(s) + '</pre>';
+					}
+					return s;
+				} else {
+					if (Array.isArray(content)) {
+						obj = [];
+					} else {
+						obj = {};
+					}
+					for (a in content) {
+						obj[a] = render(content[a], $.extend({}, options, { depth: options.depth - 1 }));
+					}
+					return obj;
+				}
+			} 
+			return markers[2];
+		}
 	}
 
 	function stripTags (html) {
@@ -847,7 +943,7 @@ w2utils.event = {
 		eventData = $.extend({}, { type: null, execute: 'before', target: null, onComplete: null }, eventData);
 	
 		if (typeof eventData.type == 'undefined') { console.log('ERROR: You must specify event type when calling .off() method of '+ this.name); return; }
-		if (typeof handler == 'undefined') { handler = null;  }
+		if (typeof handler == 'undefined') { handler = null; }
 		// remove handlers
 		var newHandlers = [];
 		for (var h in this.handlers) {
@@ -890,11 +986,11 @@ w2utils.event = {
 		}		
 		// main object events
 		var funName = 'on' + eventData.type.substr(0,1).toUpperCase() + eventData.type.substr(1);
+		var funPhasedName = 'on' + eventData.phase.substr(0,1).toUpperCase() + eventData.phase.substr(1) + eventData.type.substr(0,1).toUpperCase() + eventData.type.substr(1);
 		if (typeof this[funName] === 'function' && typeof this[funPhasedName] === 'function') {
 			alert("ERROR in Main Object: user specified both basic " + funName + " and new " + funPhasedName + " event handlers; only the latter will execute!");
 		}
 		// test for both onEvent and onBeforeEvent/onAfterEvent handlers being specified: exec the latter if both are specified.
-		var funPhasedName = 'on' + eventData.phase.substr(0,1).toUpperCase() + eventData.phase.substr(1) + eventData.type.substr(0,1).toUpperCase() + eventData.type.substr(1);
 		if ((eventData.phase == 'before' && typeof this[funName] === 'function') || typeof this[funPhasedName] === 'function') {
 			var fun = (this[funPhasedName] || this[funName]);
 			// check handler arguments
@@ -6952,16 +7048,16 @@ w2utils.keyboard = (function (obj) {
 				}
 				if (p.resizable) $(rname).show(); else $(rname).hide();
 				// insert content
-				if (typeof p.content == 'object' && p.content.render) {
+				if (typeof p.content == 'object' && typeof p.content.render === 'function') {
 					p.content.box = $(pname +'> .w2ui-panel-content')[0];
 					setTimeout(function () { 
 						// need to remove unnecessary classes
-						$(pname +'> .w2ui-panel-content').removeClass().addClass('w2ui-panel-content')
+						$(pname +'> .w2ui-panel-content').removeClass().addClass('w2ui-panel-content');
 						p.content.render(); // do not do .render(box);
 					}, 1); 
 				} else {
 					// need to remove unnecessary classes
-					$(pname +'> .w2ui-panel-content').removeClass().addClass('w2ui-panel-content').html(p.content);
+					$(pname +'> .w2ui-panel-content').removeClass().addClass('w2ui-panel-content').html(w2utils.render(p.content));
 				}
 				// if there are tabs and/or toolbar - render it
 				var tmp = $(obj.box).find(pname +'> .w2ui-panel-tabs');
@@ -10177,6 +10273,7 @@ var w2confirm = function (msg, title, callBack) {
 			this.tmp = {
 				onChange	: function (event) {
 								obj.change.call(obj, event);
+                              },
 				onClick		: function (event) {
                                 obj.click.call(obj, event);
                               },
