@@ -1287,7 +1287,9 @@
 			if (this.searches.length == 0) return;
 			if (this.toolbar) this.toolbar.uncheck('search-advanced')
 			// hide search
-			if ($('#w2ui-overlay-searches-'+ this.name +' .w2ui-grid-searches').length > 0) $().w2overlay('', { name: 'searches-'+ this.name });
+			if ($('#w2ui-overlay-searches-'+ this.name +' .w2ui-grid-searches').length > 0) {
+				$().w2overlay('', { name: 'searches-'+ this.name });
+			}
 		},
 
 		searchShowFields: function () {
@@ -2075,17 +2077,14 @@
 			var eventData = obj.trigger({ phase: 'before', type: 'keydown', target: obj.name, originalEvent: event });
 			if (eventData.isCancelled === true) return false;
 			// default behavior
+			var empty	= false;
 			var records = $('#grid_'+ obj.name +'_records');
 			var sel 	= obj.getSelection();
-			if (sel.length == 0) {
-				var ind = Math.floor((records[0].scrollTop + (records.height() / 2.1)) / obj.recordHeight);
-				obj.select({ recid: obj.records[ind].recid, column: 0});
-				sel = obj.getSelection();
-			}
-			var recid	= sel[0];
+			if (sel.length == 0) empty = true;
+			var recid	= sel[0] || null;
 			var columns = [];
 			var recid2  = sel[sel.length-1];
-			if (typeof recid == 'object') {
+			if (typeof recid == 'object' && recid != null) {
 				recid 	= sel[0].recid;
 				columns	= [];
 				var ii = 0;
@@ -2099,7 +2098,7 @@
 			var ind		= obj.get(recid, true);
 			var ind2	= obj.get(recid2, true);
 			var rec 	= obj.get(recid);
-			var recEL	= $('#grid_'+ obj.name +'_rec_'+ w2utils.escapeId(obj.records[ind].recid));
+			var recEL	= $('#grid_'+ obj.name +'_rec_'+ (ind !== null ? w2utils.escapeId(obj.records[ind].recid) : 'none'));
 			var cancel  = false;
 			switch (event.keyCode) {
 				case 8:  // backspace
@@ -2152,6 +2151,7 @@
 					break;
 
 				case 37: // left
+					if (empty) break;
 					// check if this is subgrid
 					var parent = $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(obj.records[ind].recid)).parents('tr');
 					if (parent.length > 0 && String(parent.attr('id')).indexOf('expanded_row') != -1) {
@@ -2205,6 +2205,7 @@
 
 				case 9:  // tab
 				case 39: // right
+					if (empty) break;
 					if (this.selectType == 'row') {
 						if (recEL.length <= 0 || rec.expanded === true || obj.show.expandColumn !== true) break;
 						obj.expand(recid, event);
@@ -2243,6 +2244,7 @@
 					break;
 
 				case 38: // up
+					if (empty) selectTopRecord();
 					if (recEL.length <= 0) break;
 					// move to the previous record
 					var prev = obj.prevRow(ind);
@@ -2306,6 +2308,7 @@
 					break;
 
 				case 40: // down
+					if (empty) selectTopRecord();
 					if (recEL.length <= 0) break;
 					// jump into subgrid
 					if (obj.records[ind2].expanded) {
@@ -2369,6 +2372,7 @@
 					break;
 
 				case 86: // v - paste
+					if (empty) break;
 					if (event.ctrlKey || event.metaKey) {
 						$('body').append('<textarea id="_tmp_copy_data" style="position: absolute; top: -100px; height: 1px;"></textarea>');
 						$('#_tmp_copy_data').focus();
@@ -2380,10 +2384,12 @@
 					break;
 
 				case 88: // x - cut
+					if (empty) break;
 					if (event.ctrlKey || event.metaKey) {
 						setTimeout(function () { obj.delete(true); }, 100);
 					}
 				case 67: // c - copy
+					if (empty) break;
 					if (event.ctrlKey || event.metaKey) {
 						var text = obj.copy();
 						$('body').append('<textarea id="_tmp_copy_data" style="position: absolute; top: -100px; height: 1px;">'+ text +'</textarea>');
@@ -2408,6 +2414,12 @@
 			}
 			// event after
 			obj.trigger($.extend(eventData, { phase: 'after' }));
+
+			function selectTopRecord() {
+				var ind = Math.floor((records[0].scrollTop + (records.height() / 2.1)) / obj.recordHeight);
+				if (!obj.records[ind]) ind = 0;
+				obj.select({ recid: obj.records[ind].recid, column: 0});
+			}
 
 			function tmpUnselect () {
 				if (obj.last.sel_type != 'click') return false;
@@ -3123,14 +3135,14 @@
 						'<tr><td colspan="2" style="padding: 0px">'+
 						'	<div style="cursor: pointer; padding: 2px 8px; cursor: default">'+
 						'		'+ w2utils.lang('Skip') +' <input type="text" style="width: 45px" value="'+ this.offset +'" '+
-						'				onchange="w2ui[\''+ obj.name +'\'].columnOnOff(this, event, \'skip\', this.value); $(\'#w2ui-overlay\').remove();"> '+ w2utils.lang('Records')+
+						'				onchange="w2ui[\''+ obj.name +'\'].columnOnOff(this, event, \'skip\', this.value); $(\'#w2ui-overlay\')[0].hide();"> '+ w2utils.lang('Records')+
 						'	</div>'+
 						'</td></tr>';
 			}
-			col_html +=	'<tr><td colspan="2" onclick="w2ui[\''+ obj.name +'\'].columnOnOff(this, event, \'line-numbers\'); $(\'#w2ui-overlay\').remove();">'+
+			col_html +=	'<tr><td colspan="2" onclick="w2ui[\''+ obj.name +'\'].columnOnOff(this, event, \'line-numbers\'); $(\'#w2ui-overlay\')[0].hide();">'+
 						'	<div style="cursor: pointer; padding: 4px 8px; cursor: default">'+ w2utils.lang('Toggle Line Numbers') +'</div>'+
 						'</td></tr>'+
-						'<tr><td colspan="2" onclick="w2ui[\''+ obj.name +'\'].columnOnOff(this, event, \'resize\'); $(\'#w2ui-overlay\').remove();">'+
+						'<tr><td colspan="2" onclick="w2ui[\''+ obj.name +'\'].columnOnOff(this, event, \'resize\'); $(\'#w2ui-overlay\')[0].hide();">'+
 						'	<div style="cursor: pointer; padding: 4px 8px; cursor: default">'+ w2utils.lang('Reset Column Size') + '</div>'+
 						'</td></tr>';
 			col_html += "</table></div>";
