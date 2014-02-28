@@ -260,11 +260,11 @@
 			p.hidden = false;
 			if (immediate === true) {
 				$('#layout_'+ obj.name +'_panel_'+panel).css({ 'opacity': '1' });
-				if (p.resizabled) $('#layout_'+ obj.name +'_resizer_'+panel).show();
+				if (p.resizable) $('#layout_'+ obj.name +'_resizer_'+panel).show();
 				obj.trigger($.extend(eventData, { phase: 'after' }));
 				obj.resize();
 			} else {
-				if (p.resizabled) $('#layout_'+ obj.name +'_resizer_'+panel).show();
+				if (p.resizable) $('#layout_'+ obj.name +'_resizer_'+panel).show();
 				// resize
 				$('#layout_'+ obj.name +'_panel_'+panel).css({ 'opacity': '0' });
 				$(obj.box).find(' > div > .w2ui-panel').css({
@@ -654,11 +654,11 @@
 				var pname = '#layout_'+ obj.name + '_panel_'+ p.type;
 				var rname = '#layout_'+ obj.name +'_resizer_'+ p.type;
 				// apply properties to the panel
-				var el = $(panel).css({ display: p.hidden ? 'none' : 'block' });
+				var el = $(pname).css({ display: p.hidden ? 'none' : 'block' });
 				if (el.find('> .w2ui-panel-content').length > 0) {
 					el.css('overflow', p.overflow)[0].style.cssText += ';' + p.style;
 				}
-				if (p.resizable === true) $(rname).show(); else $(rname).hide();
+				if (p.resizable) $(rname).show(); else $(rname).hide();
 				// insert content
 				if (typeof p.content == 'object' && p.content.render) {
 					p.content.box = $(pname +'> .w2ui-panel-content')[0];
