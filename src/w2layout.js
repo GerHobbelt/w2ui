@@ -658,16 +658,16 @@
 				}
 				if (p.resizable) $(rname).show(); else $(rname).hide();
 				// insert content
-				if (typeof p.content == 'object' && p.content.render) {
+				if (typeof p.content == 'object' && typeof p.content.render === 'function') {
 					p.content.box = $(pname +'> .w2ui-panel-content')[0];
 					setTimeout(function () { 
 						// need to remove unnecessary classes
-						$(pname +'> .w2ui-panel-content').removeClass().addClass('w2ui-panel-content')
+						$(pname +'> .w2ui-panel-content').removeClass().addClass('w2ui-panel-content');
 						p.content.render(); // do not do .render(box);
 					}, 1); 
 				} else {
 					// need to remove unnecessary classes
-					$(pname +'> .w2ui-panel-content').removeClass().addClass('w2ui-panel-content').html(p.content);
+					$(pname +'> .w2ui-panel-content').removeClass().addClass('w2ui-panel-content').html(w2utils.render(p.content));
 				}
 				// if there are tabs and/or toolbar - render it
 				var tmp = $(obj.box).find(pname +'> .w2ui-panel-tabs');
