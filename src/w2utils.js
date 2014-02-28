@@ -405,6 +405,9 @@ var w2utils = (function () {
 			}
 			return String(content);
 
+		case 'undefined':
+			return 'undefined';
+
 		default:
 		case 'object':
 			var markers = ['{', '}', '(OBJECT)', 'object'];

@@ -406,6 +406,9 @@ var w2utils = (function () {
 			}
 			return String(content);
 
+		case 'undefined':
+			return 'undefined';
+
 		default:
 		case 'object':
 			var markers = ['{', '}', '(OBJECT)', 'object'];
@@ -416,7 +419,7 @@ var w2utils = (function () {
 					return 'null';
 				}
 				return content;
-			} else if (Array.isArray(content)) {
+			} else if ($.isArray(content)) {
 				if (options.renderArrays === false) {
 					return content.join('');
 				} else if (options.renderArrays !== true) {
@@ -451,7 +454,7 @@ var w2utils = (function () {
 					}
 					return s;
 				} else {
-					if (Array.isArray(content)) {
+					if ($.isArray(content)) {
 						obj = [];
 					} else {
 						obj = {};

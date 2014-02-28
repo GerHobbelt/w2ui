@@ -49,7 +49,7 @@ test( "w2utils.isInt()", function() {
 	var values = {
 		1 			: true,
 		0 			: true,
-		'1'			: true,
+		'2'			: true,
 		'-1' 		: true,
 		'+1' 		: true,
 		'1.' 		: false,
@@ -79,7 +79,7 @@ test( "w2utils.isFloat()", function() {
 		'x'			: false,
 		'-1x'		: false,
 		'x-1'		: false,
-		'1'			: true,
+		'2'			: true,
 		'-1' 		: true,
 		'+1' 		: true,
 		'1.' 		: true,
@@ -111,7 +111,7 @@ test( "w2utils.isMoney() - Default Format", function() {
 	var values = {
 		1 			: true,
 		0 			: true,
-		'1'			: true,
+		'2'			: true,
 		'-1' 		: true,
 		'+1' 		: true,
 		'1.' 		: false,
@@ -148,7 +148,7 @@ test( "w2utils.isMoney() - EU Format", function() {
 	var values = {
 		1 			: true,
 		0 			: true,
-		'1'			: true,
+		'2'			: true,
 		'-1' 		: true,
 		'+1' 		: true,
 		'1.' 		: false,
@@ -219,7 +219,7 @@ test( "w2utils.isTime()", function() {
 	var values = {
 		1 			: false,
 		0 			: false,
-		'1'			: false,
+		'2'			: false,
 		'-1' 		: false,
 		'+1' 		: false,
 		'1.' 		: false,
@@ -294,3 +294,102 @@ test( "w2utils.base64encode(), w2utils.base64decode()", function() {
 		"Text with special characters" 
 	);
 });
+
+test( "w2utils.render() - default format (HTML)", function() {
+	var values = {
+		1 			: '1',
+		0 			: '0',
+		'2'			: '2',
+		'-1' 		: '-1',
+		'+1' 		: '+1',
+		'abc' 		: 'abc',
+		'<b>bold</b>' 		: '<b>bold</b>',
+		'a\nb' 		: 'a\nb'
+	};
+	deepEqual( w2utils.render(), 'undefined',		"- no argument -" );
+	deepEqual( w2utils.render(''), '', 				"- blank -" );
+	deepEqual( w2utils.render(null), 'null', 		"- null -" );
+	deepEqual( w2utils.render(undefined), 'undefined',										"- undefined -" );
+	deepEqual( w2utils.render({}), '<pre class="w2utils-display-object">{}</pre>', 			"- object -" );
+	deepEqual( w2utils.render([]), '<pre class="w2utils-display-array">[]</pre>', 			"- array -" );
+	deepEqual( w2utils.render(false), 'false',		"- boolean -" );
+	deepEqual( w2utils.render(true), 'true',		"- boolean -" );
+	deepEqual( w2utils.render(1/0), 'Infinity', 	"- +Infinity is a float -" );
+	deepEqual( w2utils.render(-1/0), '-Infinity',	"- -Infinity is a float -" );
+	deepEqual( w2utils.render(0/0), 'NaN', 			"- NaN is NOT a float -" );
+	deepEqual( w2utils.render(function() { return x; }), '<pre class="w2utils-display-function">function () { return x; }</pre>', 			"- function -" );
+	deepEqual( w2utils.render({ x: '<span>y</span>' }), '<pre class="w2utils-display-object">{\n  x: &lt;span&gt;y&lt;/span&gt;\n}</pre>', 	"- object -" );
+	deepEqual( w2utils.render([ 0, 1, 2, 3 ]), '<pre class="w2utils-display-array">[\n  0: 0\n  1: 1\n  2: 2\n  3: 3\n]</pre>',				"- array -" );
+	for (var v in values) {
+		deepEqual( w2utils.render(v), values[v], 'Test: ' + v);
+	}
+});
+
+
+test( "w2utils.render() - string format", function() {
+	var values = {
+		1 			: '1',
+		0 			: '0',
+		'2'			: '2',
+		'-1' 		: '-1',
+		'+1' 		: '+1',
+		'abc' 		: 'abc',
+		'<b>bold</b>' 		: '<b>bold</b>',
+		'a\nb' 		: 'a\nb'
+	};
+	var opts = {
+		format: 'string'
+	};
+	deepEqual( w2utils.render(undefined, opts), 'undefined',		"- no argument -" );
+	deepEqual( w2utils.render('', opts), '', 				"- blank -" );
+	deepEqual( w2utils.render(null, opts), 'null', 		"- null -" );
+	deepEqual( w2utils.render(undefined, opts), 'undefined',	"- undefined -" );
+	deepEqual( w2utils.render({}, opts), '{}', 			"- object -" );
+	deepEqual( w2utils.render([], opts), '[]', 			"- array -" );
+	deepEqual( w2utils.render(false, opts), 'false',		"- boolean -" );
+	deepEqual( w2utils.render(true, opts), 'true',		"- boolean -" );
+	deepEqual( w2utils.render(1/0, opts), 'Infinity', 	"- +Infinity is a float -" );
+	deepEqual( w2utils.render(-1/0, opts), '-Infinity',	"- -Infinity is a float -" );
+	deepEqual( w2utils.render(0/0, opts), 'NaN', 			"- NaN is NOT a float -" );
+	deepEqual( w2utils.render(function() { return x; }, opts), 'function () { return x; }', 		"- function -" );
+	deepEqual( w2utils.render({ x: '<span>y</span>' }, opts), '{\n  x: <span>y</span>\n}', 			"- object -" );
+	deepEqual( w2utils.render([ 0, 1, 2, 3 ], opts), '[\n  0: 0\n  1: 1\n  2: 2\n  3: 3\n]',		"- array -" );
+	for (var v in values) {
+		deepEqual( w2utils.render(v, opts), values[v], 'Test: ' + v);
+	}
+});
+
+
+test( "w2utils.render() - JSON format", function() {
+	var values = {
+		1 			: '1',       // due to the 'var a in values' loop producing this 'index' as a STRING
+		0 			: '0',     // due to the 'var a in values' loop producing this 'index' as a STRING
+		'2'			: '2',
+		'-1' 		: '-1',
+		'+1' 		: '+1',
+		'abc' 		: 'abc',
+		'<b>bold</b>' 		: '<b>bold</b>',
+		'a\nb' 		: 'a\nb'
+	};
+	var opts = {
+		format: 'json'
+	};
+	deepEqual( w2utils.render(undefined, opts), 'undefined',		"- no argument -" );
+	deepEqual( w2utils.render('', opts), '', 				"- blank -" );
+	deepEqual( w2utils.render(null, opts), null, 		"- null -" );
+	deepEqual( w2utils.render(undefined, opts), 'undefined',	"- undefined -" );
+	deepEqual( w2utils.render({}, opts), {}, 			"- object -" );
+	deepEqual( w2utils.render([], opts), [], 			"- array -" );
+	deepEqual( w2utils.render(false, opts), false,		"- boolean -" );
+	deepEqual( w2utils.render(true, opts), true,		"- boolean -" );
+	deepEqual( w2utils.render(1/0, opts), 2/0, 	"- +Infinity is a float -" );
+	deepEqual( w2utils.render(-1/0, opts), -2/0,	"- -Infinity is a float -" );
+	ok( isNaN(w2utils.render(0/0, opts)), 			"- NaN is NOT a float -" );
+	deepEqual( w2utils.render(function() { return x; }, opts), 'function () { return x; }', 		"- function -" );
+	deepEqual( w2utils.render({ x: '<span>y</span>' }, opts), { x: '<span>y</span>' }, 			"- object -" );
+	deepEqual( w2utils.render([ 0, 1, 2, 3 ], opts), [ 0, 1, 2, 3 ],		"- array -" );
+	for (var v in values) {
+		deepEqual( w2utils.render(v, opts), values[v], 'Test: ' + v);
+	}
+});
+
