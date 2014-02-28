@@ -31,7 +31,7 @@
 		</exec>
 		<exec executable="cmd" osfamily="windows">
 		  <arg value="/c"/>
-		  <arg value="node_modules/.bin/lessc"/>
+		  <arg value="node_modules\.bin\lessc"/>
 		  <arg value="src/less/w2ui.less"/>
 		  <arg value="dist/w2ui.css"/>
 		</exec>
@@ -43,7 +43,7 @@
 		</exec>
 		<exec executable="cmd" output="dist/w2ui.min.css" osfamily="windows">
 		  <arg value="/c"/>
-		  <arg value="node_modules/.bin/cleancss"/>
+		  <arg value="node_modules\.bin\cleancss"/>
 		  <arg value="dist/w2ui.css"/>
 		</exec>
 
@@ -61,7 +61,7 @@
 		</exec>
 		<exec executable="cmd" osfamily="windows">
 		  <arg value="/c"/>
-		  <arg value="node_modules/.bin/lessc"/>
+		  <arg value="node_modules\.bin\lessc"/>
 		  <arg value="src/less/w2ui-dark.less"/>
 		  <arg value="dist/w2ui-dark.css"/>
 		</exec>
@@ -73,7 +73,7 @@
 		</exec>
 		<exec executable="cmd" output="dist/w2ui-dark.min.css" osfamily="windows">
 		  <arg value="/c"/>
-		  <arg value="node_modules/.bin/cleancss"/>
+		  <arg value="node_modules\.bin\cleancss"/>
 		  <arg value="dist/w2ui-dark.css"/>
 		</exec>
 
@@ -94,7 +94,7 @@
 		</exec>
 		<exec executable="cmd" osfamily="windows">
 		  <arg value="/c"/>
-		  <arg value="node_modules/.bin/lessc"/>
+		  <arg value="node_modules\.bin\lessc"/>
 		  <arg value="src/kickstart/less/kickstart.less"/>
 		  <arg value="dist/kickstart.css"/>
 		</exec>
@@ -106,7 +106,7 @@
 		</exec>
 		<exec executable="cmd" output="dist/kickstart.min.css" osfamily="windows">
 		  <arg value="/c"/>
-		  <arg value="node_modules/.bin/cleancss"/>
+		  <arg value="node_modules\.bin\cleancss"/>
 		  <arg value="dist/kickstart.css"/>
 		</exec>
 
@@ -127,7 +127,7 @@
 		</exec>
 		<exec executable="cmd" osfamily="windows">
 		  <arg value="/c"/>
-		  <arg value="node_modules/.bin/lessc"/>
+		  <arg value="node_modules\.bin\lessc"/>
 		  <arg value="src/less/w2ui-fields.less"/>
 		  <arg value="dist/w2ui-fields.css"/>
 		</exec>
@@ -139,7 +139,7 @@
 		</exec>
 		<exec executable="cmd" output="dist/w2ui-fields.min.css" osfamily="windows">
 		  <arg value="/c"/>
-		  <arg value="node_modules/.bin/lessc"/>
+		  <arg value="node_modules\.bin\cleancss"/>
 		  <arg value="dist/w2ui-fields.css"/>
 		</exec>
 
@@ -165,7 +165,7 @@
 		</exec>
 		<exec executable="cmd" output="dist/w2ui.min.js" osfamily="windows">
 		  <arg value="/c"/>
-		  <arg value="node_modules/.bin/uglifyjs"/>
+		  <arg value="node_modules\.bin\uglifyjs"/>
 		  <arg value="dist/w2ui.js"/>
 		</exec>
 
@@ -190,7 +190,7 @@
 		</exec>
 		<exec executable="cmd" output="dist/w2ui-fields.min.js" osfamily="windows">
 		  <arg value="/c"/>
-		  <arg value="uglifyjs"/>
+		  <arg value="node_modules\.bin\uglifyjs"/>
 		  <arg value="dist/w2ui-fields.js"/>
 		</exec>
 
@@ -215,7 +215,7 @@
 		</exec>
 		<exec executable="cmd" output="dist/kickstart.min.js" osfamily="windows">
 		  <arg value="/c"/>
-		  <arg value="node_modules/.bin/uglifyjs"/>
+		  <arg value="node_modules\.bin\uglifyjs"/>
 		  <arg value="dist/kickstart.js"/>
 		</exec>
 
@@ -226,7 +226,16 @@
 		</replaceregexp>
 	</target>
 
-	<target name="build" depends="clean,js,css">
+	<target name="doc">
+		<echo message="------- W2UI -------"/>
+
+		<echo message="Regenerate Documentation Index Files"/>
+		<exec executable="node" dir="docs">
+			<arg value="generate.js"/>
+		</exec>
+	</target>
+
+	<target name="build" depends="clean,js,css,doc">
 		<echo message="Wrapping Up"/>
 	</target>
 </project>
