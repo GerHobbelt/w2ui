@@ -388,6 +388,7 @@
 			this.tmp = {
 				onChange	: function (event) {
 								obj.change.call(obj, event);
+                              },
 				onClick		: function (event) {
                                 obj.click.call(obj, event);
                               },
