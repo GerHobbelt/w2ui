@@ -285,13 +285,13 @@ test( "w2utils.isTime()", function() {
 });
 
 test( "w2utils.base64encode(), w2utils.base64decode()", function() {
-	ok( 
-		w2utils.base64decode(w2utils.base64encode('Some text')) === 'Some text', 
-		"Simple text" 
+	ok(
+		w2utils.base64decode(w2utils.base64encode('Some text')) === 'Some text',
+		"Simple text"
 	);
-	ok( 
-		w2utils.base64decode(w2utils.base64encode('~!@#$%^&*()_+|}{":?><`;,./\\')) === '~!@#$%^&*()_+|}{":?><`;,./\\', 
-		"Text with special characters" 
+	ok(
+		w2utils.base64decode(w2utils.base64encode('~!@#$%^&*()_+|}{":?><`;,./\\')) === '~!@#$%^&*()_+|}{":?><`;,./\\',
+		"Text with special characters"
 	);
 });
 

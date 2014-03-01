@@ -35,12 +35,11 @@
 	$.fn.w2toolbar = function(method) {
 		if (typeof method === 'object' || !method ) {
 			// check name parameter
-			if (!$.fn.w2checkNameParam(method, 'w2toolbar')) return undefined;
+			if (!w2utils.checkName(method, 'w2toolbar')) return undefined;
 			// extend items
-			var items = method.items;
+			var items = method.items || [];
 			var object = new w2toolbar(method);
-			$.extend(object, { items: [], handlers: [] });
-
+			$.extend(object, { items: [], handlers: [] });			
 			for (var i = 0, len = items.length; i < len; i++) {
 				object.items[i] = $.extend({}, w2toolbar.prototype.item, items[i]);
 			}
@@ -103,16 +102,7 @@
 					console.log('ERROR: The parameter "id" is required but not supplied in w2toolbar.add() method.');
 					return;
 				}
-				var unique = true;
-				for (var i = 0; i < this.items.length; i++) { if (this.items[i].id == items[o].id) { unique = false; return; } }
-				if (!unique) {
-					console.log('ERROR: The parameter "id" is not unique within the current toolbar.');
-					return;
-				}
-				if (!w2utils.isAlphaNumeric(items[o].id)) {
-					console.log('ERROR: The parameter "id" must be alpha-numeric + "-_".');
-					return;
-				}
+				if (!w2utils.checkUniqueId(items[o].id, this.items, 'toolbar items', this.name)) return;
 				// add item
 				var it = $.extend({}, w2toolbar.prototype.item, items[o]);
 				if (id == null) {
@@ -235,6 +225,7 @@
 		},
 
 		render: function (box) {
+			var time = (new Date()).getTime();
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'render', target: this.name, box: box });
 			if (eventData.isCancelled === true) return false;
@@ -274,7 +265,7 @@
 			if ($(this.box).length > 0) $(this.box)[0].style.cssText += this.style;
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
-			return true;
+			return (new Date()).getTime() - time;
 		},
 
 		refresh: function (id) {
@@ -328,7 +319,7 @@
 			var eventData = this.trigger({ phase: 'before', type: 'resize', target: this.name });
 			if (eventData.isCancelled === true) return false;
 
-			// empty function
+			// intentionaly blank
 
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
@@ -477,14 +468,9 @@
 							// window.click to hide it
 							$(document).on('click', hideDrop);
 							function hideDrop() {
-								it.checked = false;
-								if (it.checked) {
-									btn.addClass('checked');
-								} else {
-									btn.removeClass('checked');
-								}
-								obj.refresh(it.id);
 								$(document).off('click', hideDrop);
+								it.checked = false;
+								btn.removeClass('checked');
 							}
 						}, 1);
 					}
@@ -508,3 +494,4 @@
 	$.extend(w2toolbar.prototype, w2utils.event);
 	w2obj.toolbar = w2toolbar;
 })();
+

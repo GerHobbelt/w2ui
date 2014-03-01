@@ -54,7 +54,7 @@
 	$.fn.w2sidebar = function(method) {
 		if (typeof method === 'object' || !method ) {
 			// check name parameter
-			if (!$.fn.w2checkNameParam(method, 'w2sidebar')) return;
+			if (!w2utils.checkName(method, 'w2sidebar')) return;
 			// extend items
 			var nodes  = method.nodes;
 			var object = new w2sidebar(method); 
@@ -568,6 +568,7 @@
 		},
 				
 		render: function (box) {
+			var time = (new Date()).getTime();
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'render', target: this.name, box: box });	
 			if (eventData.isCancelled === true) return false;
@@ -611,6 +612,7 @@
 			this.trigger($.extend(eventData, { phase: 'after' }));
 			// ---
 			this.refresh();
+			return (new Date()).getTime() - time;
 		},
 		
 		refresh: function (id) {

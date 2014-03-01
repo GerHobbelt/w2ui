@@ -76,7 +76,7 @@
 		if (typeof method === 'object' || !method ) {
 			var obj = this;
 			// check name parameter
-			if (!$.fn.w2checkNameParam(method, 'w2form')) return;
+			if (!w2utils.checkName(method, 'w2form')) return;
 			// remember items
 			var record 		= method.record;
 			var original	= method.original;
@@ -621,6 +621,7 @@
 		},
 
 		refresh: function () {
+			var time = (new Date()).getTime();
 			var obj = this;
 			if (!this.box) return;
 			if (!this.isGenerated || typeof $(this.box).html() == 'undefined') return;
@@ -823,9 +824,11 @@
 			// event after
 			this.trigger($.extend(eventData, { phase: 'after' }));
 			this.resize();
+			return (new Date()).getTime() - time;
 		},
 
 		render: function (box) {
+			var time = (new Date()).getTime();
 			var obj = this;
 			if (typeof box == 'object') {
 				// remove from previous box
@@ -900,6 +903,7 @@
 				if (inputs.length > obj.focus) inputs[obj.focus].focus();
 			}
 			if (this.focus >= 0) setTimeout(focusEl, 500); // need timeout to allow form to render
+			return (new Date()).getTime() - time;
 		},
 
 		destroy: function () { 
