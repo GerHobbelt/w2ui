@@ -6602,7 +6602,7 @@ w2utils.keyboard = (function (obj) {
 		this.onShow			= null;
 		this.onHide			= null;
 		this.onResizing 	= null;
-		this.onResizerClick	= null
+		this.onResizerClick	= null;
 		this.onRender		= null;
 		this.onRefresh		= null;
 		this.onResize		= null;
@@ -6696,6 +6696,7 @@ w2utils.keyboard = (function (obj) {
 				toolbar	: false,
 				tabs	: false
 			},
+			handlers	: [],
 			onRefresh	: null,
 			onShow		: null,
 			onHide		: null
@@ -7662,19 +7663,6 @@ var w2popup = {};
 
 (function () {
 
-	var w2window = function (options) {
-		this.box		= null;		// DOM Element that holds the element
-		this.name		= null;		// unique name for w2ui
-		this.handlers	= [];
-		this.onClick	= null;
-		this.onRender	= null;
-		this.onRefresh	= null;
-		this.onResize	= null;
-		this.onDestroy	= null;
-
-		w2utils.deepCopy(this, w2obj.w2window, options);
-	};
-
 	// ====================================================
 	// -- Registers as a jQuery plugin
 
@@ -7718,369 +7706,10 @@ var w2popup = {};
 		return w2popup[method]($.extend({}, dlgOptions, options));
 	};
 
-
-	$.fn.w2window = function(method) {
-		if (typeof method === 'object' || !method ) {
-			// check name parameter
-			if (!$.fn.w2checkNameParam(method, 'w2window')) return;
-			// extend items
-			var items = method.items || [];
-			var object = new w2window(method);
-			for (var i = 0, len = items.length; i < len; i++) {
-				object.items[i] = $.extend({}, w2window.prototype.item, items[i]);
-			}
-			if ($(this).length !== 0) {
-				object.render($(this)[0]);
-			}
-			// register new object
-			w2ui[object.name] = object;
-			return object;
-		} else if (w2ui[$(this).attr('name')]) {
-			var obj = w2ui[$(this).attr('name')];
-			obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
-			return this;
-		} else {
-			console.log('ERROR: Method ' +  method + ' does not exist on jQuery.w2window' );
-		}
-	};
-
-	// ====================================================
-	// -- Implementation of core functionality
-
-	w2window.prototype = {
-		item: {
-			id		: null,		// command to be sent to all event handlers
-			text	: '',
-			html	: '',
-			img		: null,
-			icon	: null,
-			hidden	: false,
-			disabled: false,
-			hint	: '',
-			onClick	: null
-		},
-
-		show: function (id) {
-			var items = 0;
-			for (var a = 0; a < arguments.length; a++) {
-				var it = this.get(arguments[a]);
-				if (!it) continue;
-				items++;
-				it.hidden = false;
-				this.refresh(it.id);
-			}
-			return items;
-		},
-
-		hide: function (id) {
-			var items = 0;
-			for (var a = 0; a < arguments.length; a++) {
-				var it = this.get(arguments[a]);
-				if (!it) continue;
-				items++;
-				it.hidden = true;
-				this.refresh(it.id);
-			}
-			return items;
-		},
-
-		enable: function (id) {
-			var items = 0;
-			for (var a = 0; a < arguments.length; a++) {
-				var it = this.get(arguments[a]);
-				if (!it) continue;
-				items++;
-				it.disabled = false;
-				this.refresh(it.id);
-			}
-			return items;
-		},
-
-		disable: function (id) {
-			var items = 0;
-			for (var a = 0; a < arguments.length; a++) {
-				var it = this.get(arguments[a]);
-				if (!it) continue;
-				items++;
-				it.disabled = true;
-				this.refresh(it.id);
-			}
-			return items;
-		},
-
-		render: function (box) {
-			// event before
-			var eventData = this.trigger({ phase: 'before', type: 'render', target: this.name, box: box });
-			if (eventData.isCancelled === true) return false;
-
-			if (typeof box != 'undefined' && box !== null) {
-				if ($(this.box).find('> table #tb_'+ this.name + '_right').length > 0) {
-					$(this.box)
-						.removeAttr('name')
-						.removeClass('w2ui-reset w2ui-toolbar')
-						.html('');
-				}
-				this.box = box;
-			}
-			if (!this.box) return;
-			// render all buttons
-			var html =	'<table cellspacing="0" cellpadding="0" width="100%">'+
-						'<tr>';
-			for (var i = 0; i < this.items.length; i++) {
-				var it = this.items[i];
-				if (typeof it.id == 'undefined' || it.id === null) it.id = "item_" + i;
-				if (it === null)  continue;
-				if (it.type == 'spacer') {
-					html += '<td width="100%" id="tb_'+ this.name +'_item_'+ it.id +'" align="right"></td>';
-				} else {
-					html += '<td id="tb_'+ this.name + '_item_'+ it.id +'" style="'+ (it.hidden ? 'display: none' : '') +'" '+
-							'	class="'+ (it.disabled ? 'disabled' : '') +'" valign="middle">'+ this.getItemHTML(it) +
-							'</td>';
-				}
-			}
-			html += '<td width="100%" id="tb_'+ this.name +'_right" align="right">'+ this.right +'</td>';
-			html += '</tr>'+
-					'</table>';
-			$(this.box)
-				.attr('name', this.name)
-				.addClass('w2ui-reset w2ui-toolbar')
-				.html(html);
-			if ($(this.box).length > 0) $(this.box)[0].style.cssText += this.style;
-			// event after
-			this.trigger($.extend(eventData, { phase: 'after' }));
-		},
-
-		refresh: function (id) {
-			var time = (new Date()).getTime();
-			// event before
-			var eventData = this.trigger({ phase: 'before', type: 'refresh', target: (typeof id != 'undefined' ? id : this.name), item: this.get(id) });
-			if (eventData.isCancelled === true) return false;
-
-			if (typeof id == 'undefined') {
-				// refresh all
-				for (var i = 0; i < this.items.length; i++) {
-					var it1 = this.items[i];
-					if (typeof it1.id == 'undefined' || it1.id === null) it1.id = "item_" + i;
-					this.refresh(it1.id);
-				}
-			}
-			// create or refresh only one item
-			var it = this.get(id);
-			if (it === null) return;
-
-			var el = $(this.box).find('#tb_'+ this.name +'_item_'+ w2utils.escapeId(it.id));
-			var html  = this.getItemHTML(it);
-			if (el.length === 0) {
-				// does not exist - create it
-				if (it.type == 'spacer') {
-					html = '<td width="100%" id="tb_'+ this.name +'_item_'+ it.id +'" align="right"></td>';
-				} else {
-					html =  '<td id="tb_'+ this.name + '_item_'+ it.id +'" style="'+ (it.hidden ? 'display: none' : '') +'" '+
-						'	class="'+ (it.disabled ? 'disabled' : '') +'" valign="middle">'+ html +
-						'</td>';
-				}
-				if (this.get(id, true) == this.items.length-1) {
-					$(this.box).find('#tb_'+ this.name +'_right').before(html);
-				} else {
-					$(this.box).find('#tb_'+ this.name +'_item_'+ w2utils.escapeId(this.items[parseInt(this.get(id, true))+1].id)).before(html);
-				}
-			} else {
-				// refresh
-				el.html(html);
-				if (it.hidden) { el.css('display', 'none'); } else { el.css('display', ''); }
-				if (it.disabled) { el.addClass('disabled'); } else { el.removeClass('disabled'); }
-			}
-			// event after
-			this.trigger($.extend(eventData, { phase: 'after' }));
-			return (new Date()).getTime() - time;
-		},
-
-		resize: function () {
-			var time = (new Date()).getTime();
-			// event before
-			var eventData = this.trigger({ phase: 'before', type: 'resize', target: this.name });
-			if (eventData.isCancelled === true) return false;
-
-			// empty function
-
-			// event after
-			this.trigger($.extend(eventData, { phase: 'after' }));
-			return (new Date()).getTime() - time;
-		},
-
-		destroy: function () {
-			// event before
-			var eventData = this.trigger({ phase: 'before', type: 'destroy', target: this.name });
-			if (eventData.isCancelled === true) return false;
-			// clean up
-			if ($(this.box).find('> table #tb_'+ this.name + '_right').length > 0) {
-				$(this.box)
-					.removeAttr('name')
-					.removeClass('w2ui-reset w2ui-toolbar')
-					.html('');
-			}
-			$(this.box).html('');
-			delete w2ui[this.name];
-			// event after
-			this.trigger($.extend(eventData, { phase: 'after' }));
-		},
-
-		// ========================================
-		// --- Internal Functions
-
-		getItemHTML: function (item) {
-			var html = '';
-
-			if (typeof item.caption != 'undefined') item.text = item.caption;
-			if (typeof item.hint == 'undefined') item.hint = '';
-			if (typeof item.text == 'undefined') item.text = '';
-
-			switch (item.type) {
-				case 'menu':
-				case 'button':
-				case 'check':
-				case 'radio':
-				case 'drop':
-					var img = '<td>&nbsp;</td>';
-					if (item.img)  img = '<td><div class="w2ui-tb-image w2ui-icon '+ item.img +'"></div></td>';
-					if (item.icon) img = '<td><div class="w2ui-tb-image"><span class="'+ item.icon +'"></span></div></td>';
-					html += '<table cellpadding="0" cellspacing="0" title="'+ item.hint +'" class="w2ui-button '+ (item.checked ? 'checked' : '') +'" '+
-							'       onclick     = "var el=w2ui[\''+ this.name + '\']; if (el) el.click(\''+ item.id +'\', event);" '+
-							'       onmouseover = "' + (!item.disabled ? "$(this).addClass('over');" : "") + '"'+
-							'       onmouseout  = "' + (!item.disabled ? "$(this).removeClass('over');" : "") + '"'+
-							'       onmousedown = "' + (!item.disabled ? "$(this).addClass('down');" : "") + '"'+
-							'       onmouseup   = "' + (!item.disabled ? "$(this).removeClass('down');" : "") + '"'+
-							'>'+
-							'<tr><td>'+
-							'  <table cellpadding="1" cellspacing="0">'+
-							'  <tr>' +
-									img +
-									(item.text !== '' ? '<td class="w2ui-tb-caption" nowrap>'+ item.text +'</td>' : '') +
-									(((item.type == 'drop' || item.type == 'menu') && item.arrow !== false) ?
-										'<td class="w2ui-tb-down" nowrap><div></div></td>' : '') +
-							'  </tr></table>'+
-							'</td></tr></table>';
-					break;
-
-				case 'break':
-					html +=	'<table cellpadding="0" cellspacing="0"><tr>'+
-							'    <td><div class="w2ui-break">&nbsp;</div></td>'+
-							'</tr></table>';
-					break;
-
-				case 'html':
-					html +=	'<table cellpadding="0" cellspacing="0"><tr>'+
-							'    <td nowrap>' + item.html + '</td>'+
-							'</tr></table>';
-					break;
-			}
-
-			var newHTML = '';
-			if (typeof item.onRender == 'function') newHTML = item.onRender.call(this, item.id, html);
-			if (typeof this.onRender == 'function') newHTML = this.onRender(item.id, html);
-			if (newHTML !== '' && typeof newHTML != 'undefined') html = newHTML;
-			return html;
-		},
-
-		menuClick: function (event) {
-			var obj = this;
-			if (event.item && !event.item.disabled) {
-				// event before
-				var eventData = this.trigger({ phase: 'before', type: 'click', target: event.item.id + ':' + event.subItem.id, item: event.item,
-					subItem: event.subItem, originalEvent: event.originalEvent });
-				if (eventData.isCancelled === true) return false;
-
-				// intentionaly blank
-
-				// event after
-				this.trigger($.extend(eventData, { phase: 'after' }));
-			}
-		},
-
-		click: function (id, event) {
-			var obj = this;
-			var it  = this.get(id);
-			if (it && !it.disabled) {
-				// event before
-				var eventData = this.trigger({ phase: 'before', type: 'click', target: (typeof id != 'undefined' ? id : this.name),
-					item: this.get(id), originalEvent: event });
-				if (eventData.isCancelled === true) return false;
-
-				var btn = $('#tb_'+ this.name +'_item_'+ w2utils.escapeId(it.id) +' table.w2ui-button');
-				btn.removeClass('down');
-
-				if (it.type == 'radio') {
-					for (var i = 0; i < this.items.length; i++) {
-						var itt = this.items[i];
-						if (itt === null || itt.id == it.id || itt.type != 'radio') continue;
-						if (itt.group == it.group && itt.checked) {
-							itt.checked = false;
-							this.refresh(itt.id);
-						}
-					}
-					it.checked = true;
-					btn.addClass('checked');
-				}
-
-				if (it.type == 'drop' || it.type == 'menu') {
-					if (it.checked) {
-						// if it was already checked, second click will hide it
-						it.checked = false;
-					} else {
-						// show overlay
-						setTimeout(function () {
-							var el = $('#tb_'+ obj.name +'_item_'+ w2utils.escapeId(it.id));
-							if (!$.isPlainObject(it.overlay)) it.overlay = {};
-							var left = (el.width() - 50) / 2;
-							if (left > 19) left = 19;
-							if (it.type == 'drop') {
-								el.w2overlay(it.html, $.extend({ left: left, top: 3 }, it.overlay));
-							}
-							if (it.type == 'menu') {
-								el.w2menu(it.items, $.extend({ left: left, top: 3 }, it.overlay, {
-									select: function (event) {
-										obj.menuClick({ item: it, subItem: event.item, originalEvent: event.originalEvent });
-										hideDrop();
-									}
-								}));
-							}
-							// window.click to hide it
-							$(document).on('click', hideDrop);
-							function hideDrop() {
-								it.checked = false;
-								if (it.checked) {
-									btn.addClass('checked');
-								} else {
-									btn.removeClass('checked');
-								}
-								obj.refresh(it.id);
-								$(document).off('click', hideDrop);
-							}
-						}, 1);
-					}
-				}
-
-				if (it.type == 'check' || it.type == 'drop' || it.type == 'menu') {
-					it.checked = !it.checked;
-					if (it.checked) {
-						btn.addClass('checked');
-					} else {
-						btn.removeClass('checked');
-					}
-				}
-				// event after
-				this.trigger($.extend(eventData, { phase: 'after' }));
-			}
-		}
-	};
-
-	$.extend(w2window.prototype, w2utils.event);
-	w2obj.window = w2window;
-
 	// ====================================================
 	// -- Implementation of core functionality (SINGELTON)
 
-	w2window.prototype = {
+	w2popup = {
 		defaults: {
 			title			: '',
 			body			: '',
@@ -8098,29 +7727,19 @@ var w2popup = {};
 			showMax			: false,
 			transition		: null
 		},
-
-		item: {
-			id			: null,
-			status		: 'closed', 	// string that describes current status
-			handlers	: [],
-			onOpen		: null,
-			onClose		: null,
-			onMax		: null,
-			onMin		: null,
-			onKeydown   : null,
-
-			text		: '',
-			html		: '',
-			img			: null,
-			icon		: null,
-			hint		: '',
-		},
+		status		: 'closed', 	// string that describes current status
+		handlers	: [],
+		onOpen		: null,
+		onClose		: null,
+		onMax		: null,
+		onMin		: null,
+		onKeydown   : null,
 
 		open: function (options) {
 			var obj = this;
 			if (w2popup.status == 'closing') {
-				setTimeout(function () {
-					obj.open.call(obj, options);
+				setTimeout(function () { 
+					obj.open.call(obj, options); 
 				}, 100);
 				return;
 			}
@@ -8128,8 +7747,8 @@ var w2popup = {};
 			var old_options = $('#w2ui-popup').data('options');
 			var options = $.extend({}, this.defaults, { body : '' }, old_options, options, { maximized: false });
 			// need timer because popup might not be open
-			setTimeout(function () {
-				$('#w2ui-popup').data('options', options);
+			setTimeout(function () { 
+				$('#w2ui-popup').data('options', options); 
 			}, 100);
 			// if new - reset event handlers
 			var event_types = [
@@ -8139,7 +7758,7 @@ var w2popup = {};
 				'close',
 				'keydown'
 			];
-			var event_phases = [
+			var event_phases = [ 
 				'',
 				'before',
 				'after'
@@ -8168,7 +7787,7 @@ var w2popup = {};
 			if (window.innerHeight == undefined) {
 				var width  = document.documentElement.offsetWidth;
 				var height = document.documentElement.offsetHeight;
-				if (w2utils.engine == 'IE7') { width += 21; height += 4; }
+				if (w2utils.engine === 'IE7') { width += 21; height += 4; }
 			} else {
 				var width  = window.innerWidth;
 				var height = window.innerHeight;
@@ -8665,12 +8284,8 @@ var w2popup = {};
 	};
 
 	// merge in event handling
-	$.extend(w2window.prototype, w2utils.event);
-	w2obj.window = w2window;
+	$.extend(w2popup, w2utils.event);
 
-	// and create a singleton instance for popups:
-	w2popup = new w2window('create', {});
-	
 })();
 
 // ============================================
@@ -9741,6 +9356,7 @@ var w2confirm = function (msg, title, callBack) {
 			// extend items
 			var nodes  = method.nodes || [];
 			var object = new w2sidebar(method);
+            // nuke the nodes ref in `object` itself so that the .add() method can do a proper job of (re)adding the nodes next:
 			object.nodes = [];
 			object.add(object, nodes);
 			if ($(this).length !== 0) {
