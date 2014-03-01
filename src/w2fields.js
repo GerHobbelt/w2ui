@@ -39,8 +39,9 @@
 		// public properties
 		this.el			= null
 		this.helpers	= {}; // object or helper elements
+		this.handlers	= [];
 		this.type		= options.type || 'text';
-		this.options	= $.extend(true, {}, options);
+		this.options	= w2utils.deepCopy({}, options);
 		this.onSearch	= options.onSearch		|| null;
 		this.onRequest	= options.onRequest		|| null;
 		this.onLoad		= options.onLoad		|| null;
@@ -59,10 +60,13 @@
 		delete this.options.onLoad;
 		delete this.options.onError;
 		delete this.options.onClick;
+		delete this.options.onAdd;
+		delete this.options.onNew;
+		delete this.options.onRemove;
 		delete this.options.onMouseOver;
 		delete this.options.onMouseOut;
 		// extend with defaults
-		$.extend(true, this, w2obj.field);
+		w2utils.deepCopy(this, w2obj.field);
 	};
 
 	// ====================================================
@@ -77,7 +81,7 @@
 			}
 		} else {
 			if (typeof method == 'string' && typeof options == 'object') {
-				method = $.extend(true, {}, options, { type: method });
+				method = w2utils.deepCopy({}, options, { type: method });
 			}
 			if (typeof method == 'string' && typeof options == 'undefined') {
 				method = { type: method };
@@ -88,7 +92,6 @@
 				// if object is not defined, define it
 				if (typeof obj == 'undefined') {
 					var obj = new w2field(method);
-					$.extend(obj, { handlers: [] });
 					if (el) obj.el = $(el)[0];
 					obj.init();
 					$(el).data('w2field', obj);
@@ -97,7 +100,6 @@
 					obj.clear();
 					if (method.type == 'clear') return;
 					var obj = new w2field(method);
-					$.extend(obj, { handlers: [] });
 					if (el) obj.el = $(el)[0];
 					obj.init();
 					$(el).data('w2field', obj);
@@ -199,7 +201,7 @@
 						prefix			: '',
 						suffix			: ''
 					};
-					this.options = $.extend(true, {}, defaults, options);
+					this.options = w2utils.deepCopy({}, defaults, options);
 					options = this.options; // since object is re-created, need to re-assign
 					options.numberRE  = new RegExp('['+ options.groupSymbol + ']', 'g');
 					options.moneyRE   = new RegExp('['+ options.currencyPrefix + options.currencySuffix + options.groupSymbol + ']', 'g');
@@ -242,7 +244,7 @@
 						blocked		: {},		// { '4/11/2011': 'yes' }
 						colored		: {}		// { '4/11/2011': 'red:white' }
 					};
-					this.options = $.extend(true, {}, defaults, options);
+					this.options = w2utils.deepCopy({}, defaults, options);
 					options = this.options; // since object is re-created, need to re-assign
 					$(this.el).attr('placeholder', options.placeholder ? options.placeholder : options.format);
 					break;
@@ -256,7 +258,7 @@
 						start		: '',
 						end			: ''
 					};
-					this.options = $.extend(true, {}, defaults, options);
+					this.options = w2utils.deepCopy({}, defaults, options);
 					options = this.options; // since object is re-created, need to re-assign
 					$(this.el).attr('placeholder', options.placeholder ? options.placeholder : (options.format == 'h12' ? 'hh:mi pm' : 'hh:mi'));
 					break;
@@ -489,7 +491,7 @@
 					html += '<li index="'+ s +'" style="max-width: '+ parseInt(options.maxWidth) + 'px; '+ (it.style ? it.style : '') +'">'+
 							ren +'</li>';
 				}
-				var div = obj.helpers['multi'];
+				var div = obj.helpers.multi;
 				var ul  = div.find('ul');
 				div.attr('style', div.attr('style') + ';' + options.style);
 				if ($(obj.el).attr('readonly')) div.addClass('w2ui-readonly'); else div.removeClass('w2ui-readonly');
@@ -685,7 +687,7 @@
 		},
 
 		click: function (event) {
-			event.stopPropagation(); 
+			event.stopPropagation();
 			// lists
 			if (['list', 'combo', 'enum'].indexOf(this.type) != -1) {
 				if (!$(this.el).is(':focus')) this.focus(event);
@@ -708,14 +710,14 @@
 			// list
 			if (obj.type == 'list') {
 				if (!$(obj.el).data('focused')) {
-					obj.helpers['focus'].find('input').focus();
+					obj.helpers.focus.find('input').focus();
 				} else {
 					$(obj.el).css({ 'outline': 'auto 5px #7DB4F3', 'outline-offset': '-2px' });
 					setTimeout(function () {
 						if (!options.search) {
 							$(obj.el).data('keep_focus', true);
 							setTimeout(function () { $(obj.el).removeData('keep_focus'); }, 100);
-							obj.helpers['focus'].find('input').focus();
+							obj.helpers.focus.find('input').focus();
 						} else {
 							setTimeout(function () { $('#w2ui-overlay #menu-search').focus(); }, 10);
 						}
@@ -734,7 +736,7 @@
 			}
 			// file
 			if (obj.type == 'file') {
-				$(obj.helpers['multi']).css({ 'outline': 'auto 5px #7DB4F3', 'outline-offset': '-2px' });
+				$(obj.helpers.multi).css({ 'outline': 'auto 5px #7DB4F3', 'outline-offset': '-2px' });
 			}
 		},
 
@@ -783,18 +785,18 @@
 			}
 			if (obj.type == 'list') {
 				if ($(obj.el).data('focused')) {
-					obj.helpers['focus'].find('input').blur();
+					obj.helpers.focus.find('input').blur();
 				} else {
 					$(obj.el).css({ 'outline': 'none' });
 				}
 			}
 			// clear search input
 			if (obj.type == 'enum') {
-				$(obj.helpers['multi']).find('input').val('').width(20);
+				$(obj.helpers.multi).find('input').val('').width(20);
 			}
 			// file
 			if (obj.type == 'file') {
-				$(obj.helpers['multi']).css({ 'outline': 'none' });
+				$(obj.helpers.multi).css({ 'outline': 'none' });
 			}
 		},
 
@@ -965,7 +967,7 @@
 						if ($(obj.el).val() != '') break;
 					case 13: // enter
 						var item  = options.items[options.index];
-						var multi = $(obj.helpers['multi']).find('input');
+						var multi = $(obj.helpers.multi).find('input');
 						if (['enum'].indexOf(obj.type) != -1) {
 							if (item) {
 								// trigger event
@@ -1013,7 +1015,7 @@
 						break;
 					case 8: // delete
 						if (['enum'].indexOf(obj.type) != -1) {
-							if ($(obj.helpers['multi']).find('input').val() == '' && selected.length > 0) {
+							if ($(obj.helpers.multi).find('input').val() == '' && selected.length > 0) {
 								var item = selected[selected.length - 1];
 								// trigger event
 								var eventData = obj.trigger({ phase: 'before', type: 'remove', target: obj.el, originalEvent: event.originalEvent, item: item });
@@ -1045,7 +1047,7 @@
 						}
 						// show overlay if not shown
 						var input = obj.el;
-						if (['enum'].indexOf(obj.type) != -1) input = obj.helpers['multi'].find('input');
+						if (['enum'].indexOf(obj.type) != -1) input = obj.helpers.multi.find('input');
 						if ($(input).val() == '' && $('#w2ui-overlay').length == 0) {
 							obj.tmp.force_open = true;
 						} else {
@@ -1062,7 +1064,7 @@
 					setTimeout(function () {
 						// set cursor to the end
 						if (['enum'].indexOf(obj.type) != -1) {
-							var tmp = obj.helpers['multi'].find('input').get(0);
+							var tmp = obj.helpers.multi.find('input').get(0);
 							tmp.setSelectionRange(tmp.value.length, tmp.value.length);
 						} else {
 							obj.el.setSelectionRange(obj.el.value.length, obj.el.value.length);
@@ -1072,7 +1074,7 @@
 				}
 				// expand input
 				if (['enum'].indexOf(obj.type) != -1) {
-					var input  = obj.helpers['multi'].find('input');
+					var input  = obj.helpers.multi.find('input');
 					var search = input.val();
 					input.width(((search.length + 2) * 8) + 'px');
 				}
@@ -1096,7 +1098,7 @@
 			var options  = this.options;
 			var search 	 = $(obj.el).val() || '';
 			if (obj.type == 'enum') {
-				var tmp = $(obj.helpers['multi']).find('input');
+				var tmp = $(obj.helpers.multi).find('input');
 				if (tmp.length == 0) return;
 				search = tmp.val();
 			}
@@ -1186,7 +1188,7 @@
 			var ids = [];
 			if (obj.type == 'list') return; // list has its own search field
 			if (['enum'].indexOf(obj.type) != -1) {
-				target = $(obj.helpers['multi']).find('input');
+				target = $(obj.helpers.multi).find('input');
 				search = target.val();
 				for (var s in options.selected) { ids.push(options.selected[s].id); }
 			}
@@ -1250,8 +1252,8 @@
 						$(this).html('&#149;');
 					})
 					.on('mouseup', function () {
-						setTimeout(function () { 
-							if ($("#w2ui-overlay").length > 0) $('#w2ui-overlay').removeData('keepOpen')[0].hide(); 
+						setTimeout(function () {
+							if ($("#w2ui-overlay").length > 0) $('#w2ui-overlay').removeData('keepOpen')[0].hide();
 						}, 10);
 					});
 			}
@@ -1274,8 +1276,8 @@
 							$(this).css({ 'background-color': '#B6D5FB', 'border-color': '#aaa' });
 						})
 						.on('mouseup', function () {
-							setTimeout(function () { 
-								if ($("#w2ui-overlay").length > 0) $('#w2ui-overlay').removeData('keepOpen')[0].hide(); 
+							setTimeout(function () {
+								if ($("#w2ui-overlay").length > 0) $('#w2ui-overlay').removeData('keepOpen')[0].hide();
 							}, 10);
 						});
 					$('#w2ui-overlay .previous').on('mousedown', function () {
@@ -1326,7 +1328,7 @@
 				var el		= this.el;
 				var input	= this.el;
 				if (this.type == 'enum') {
-					el		= $(this.helpers['multi']);
+					el		= $(this.helpers.multi);
 					input	= $(el).find('input');
 				}
 				if ($(input).is(':focus') || this.type == 'list') {
@@ -1340,7 +1342,7 @@
 						return;
 					}
 					if ($(input).val() != '') delete obj.tmp.force_open;
-					$(el).w2menu('refresh', $.extend(true, {}, options, {
+					$(el).w2menu('refresh', w2utils.deepCopy({}, options, {
 						render		: options.renderDrop,
 						maxHeight	: options.maxDropHeight,
 						// selected with mouse
@@ -1356,7 +1358,7 @@
 									delete event.item.hidden;
 									selected.push(event.item);
 									$(obj.el).data('selected', selected).change();
-									$(obj.helpers['multi']).find('input').val('').width(20);
+									$(obj.helpers.multi).find('input').val('').width(20);
 									obj.refresh();
 									if ($("#w2ui-overlay").length > 0) $('#w2ui-overlay')[0].hide();
 									// event after
@@ -1369,7 +1371,7 @@
 								// hide overlay, focus helper
 								setTimeout(function () {
 									$('#w2ui-overlay').remove();
-									if (options.search) obj.helpers['focus'].find('input').focus();
+									if (options.search) obj.helpers.focus.find('input').focus();
 								}, 1);
 							} else {
 								$(obj.el).data('selected', event.item).val(event.item.text).change();
@@ -1480,7 +1482,7 @@
 						});
 					$(obj.el).css('padding-left', (helper.width() + parseInt($(obj.el).css('padding-left'), 10)) + 'px');
 					// remember helper
-					obj.helpers['prefix'] = helper;
+					obj.helpers.prefix = helper;
 				}
 			}, 1);
 		},
@@ -1538,7 +1540,7 @@
 					pr += helper.width() + 12;
 					$(obj.el).css('padding-right', pr + 'px');
 					// remember helper
-					obj.helpers['arrows'] = helper;
+					obj.helpers.arrows = helper;
 				}
 				if (obj.options.suffix !== '') {
 					$(obj.el).after(
@@ -1562,7 +1564,7 @@
 					pr += helper.width() + 3;
 					$(obj.el).css('padding-right', pr + 'px');
 					// remember helper
-					obj.helpers['suffix'] = helper;
+					obj.helpers.suffix = helper;
 				}
 			}, 1);
 		},
@@ -1571,7 +1573,7 @@
 			var obj		 = this;
 			var options	 = this.options;
 			// clean up & init
-			$(obj.helpers['multi']).remove();
+			$(obj.helpers.multi).remove();
 			// build helper
 			var html   = '';
 			var margin =
@@ -1610,7 +1612,7 @@
 				});
 
 			var div	= $(obj.el).prev();
-			obj.helpers['multi'] = div;
+			obj.helpers.multi = div;
 			if (obj.type == 'enum') {
 				$(obj.el).attr('tabindex', -1);
 				// INPUT events
@@ -1686,7 +1688,7 @@
 				var helper;
 				$(obj.el).before('<div class="w2ui-field-helper" style="margin-left: 30px; opacity: 0"><input type="text" size="1"></div>');
 				helper = $(obj.el).prev();
-				obj.helpers['focus'] = helper;
+				obj.helpers.focus = helper;
 				var index = $(obj.el).attr('tabindex');
 				var input = helper.find('input');
 				if (index > 0) input.attr('tabindex', index);
@@ -1815,9 +1817,9 @@
 		getColorHTML: function () {
 			var html =  '<div class="w2ui-color">'+
 						'<table cellspacing="5">';
-			for (var i=0; i<8; i++) {
+			for (var i = 0; i < 8; i++) {
 				html += '<tr>';
-				for (var j=0; j<8; j++) {
+				for (var j = 0; j < 8; j++) {
 					html += '<td>'+
 							'	<div class="color" style="background-color: #'+ this.pallete[i][j] +';" name="'+ this.pallete[i][j] +'" index="'+ i + ':' + j +'">'+
 							'		'+ ($(this.el).val() == this.pallete[i][j] ? '&#149;' : '&nbsp;')+

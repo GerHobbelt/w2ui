@@ -1,7 +1,7 @@
 <div class="content">
 	<div id="example_title">
 		<h1>Render to a New Box</h1>
-		When you create a grid it is not required to provide a containter, thus it creates a grid in memory.
+		When you create a grid it is not required to provide a container, thus it creates a grid in memory.
 		The example below illustrates how to create a grid in memory and render it when needed and where needed.
 	</div>
 	<div id="example_view"></div>
@@ -18,6 +18,7 @@
 <input type="button" value="Render into Red Box" onclick="$('#grid2').w2render('grid');">
 
 <!--CODE-->
+<script>
 $(function () {
 	$().w2grid({ 
 		name: 'grid', 
@@ -38,3 +39,4 @@ $(function () {
 		]
 	});
 });
+</script>

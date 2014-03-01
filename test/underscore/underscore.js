@@ -236,7 +236,7 @@
     if (_.isString(obj)) return obj.indexOf(prefix) == 0;
     if (!_.isArray(obj) || (!_.isArray(prefix))) return false;
     if (obj.length < prefix.length) return false;
-    for (var i=0; i < obj.length && i < prefix.length; i++) {
+    for (var i = 0; i < obj.length && i < prefix.length; i++) {
       if (obj[i] !== prefix[i]) return false;
     }
     return true;
@@ -255,7 +255,7 @@
     var objLength = obj.length,
         tailLength = tail.length;
     if (objLength < tailLength) return false;
-    for (var i=0; i < tailLength; i++) {
+    for (var i = 0; i < tailLength; i++) {
       if (obj[objLength - 1 - i] !== tail[tailLength - 1 - i]) return false;
     }
     return true;

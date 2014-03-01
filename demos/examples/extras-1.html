@@ -11,6 +11,7 @@
 <input type="button" value="Lock Screen" onclick="lockScreen();">
 
 <!--CODE-->
+<script>
 function lockScreen() {
     w2utils.lock('body', {
     	msg: 'Locking the screen...',
@@ -22,3 +23,4 @@ function lockScreen() {
     	w2utils.unlock('body');
     });
 }
+</script>

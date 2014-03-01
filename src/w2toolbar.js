@@ -19,6 +19,7 @@
 		this.box		= null;		// DOM Element that holds the element
 		this.name		= null;		// unique name for w2ui
 		this.items		= [];
+		this.handlers	= [];
 		this.right		= '';		// HTML text on the right of toolbar
 		this.onClick	= null;
 		this.onRender	= null;
@@ -26,7 +27,7 @@
 		this.onResize	= null;
 		this.onDestroy	= null;
 
-		$.extend(true, this, w2obj.toolbar, options);
+		w2utils.deepCopy(this, w2obj.toolbar, options);
 	};
 
 	// ====================================================
@@ -39,7 +40,6 @@
 			// extend items
 			var items = method.items || [];
 			var object = new w2toolbar(method);
-			$.extend(object, { items: [], handlers: [] });			
 			for (var i = 0, len = items.length; i < len; i++) {
 				object.items[i] = $.extend({}, w2toolbar.prototype.item, items[i]);
 			}
@@ -49,7 +49,6 @@
 			// register new object
 			w2ui[object.name] = object;
 			return object;
-
 		} else if (w2ui[$(this).attr('name')]) {
 			var obj = w2ui[$(this).attr('name')];
 			obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
@@ -65,7 +64,7 @@
 
 	w2toolbar.prototype = {
 		item: {
-			id		: null,		// commnad to be sent to all event handlers
+			id		: null,		// command to be sent to all event handlers
 			type	: 'button',	// button, check, radio, drop, menu, break, html, spacer
 			text	: '',
 			html	: '',

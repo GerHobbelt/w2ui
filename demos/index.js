@@ -152,7 +152,7 @@ $(function () {
 			},
 			{ id: 'extras', text: 'Extras', img: 'icon-folder', group1: true,
 				nodes: [
-					{ id: 'lockscreen-1', text: 'Lock Screen', icon: 'fa-list-alt' }
+					{ id: 'extras-1', text: 'Lock Screen', icon: 'fa-list-alt' }
 				]
 			},
 			{ id: 'utils', text: 'Utilities', img: 'icon-folder', group1: true,
@@ -183,18 +183,24 @@ $(function () {
 			$.get('examples/'+ cmd +'.html', function (data) {
 				var tmp = data.split('<!--CODE-->');
 				if (tmp.length == 1) {
-					alert('ERORR: cannot parse example.');
-					console.log('ERORR: cannot parse example.', data);
+					alert('ERROR: cannot parse example.');
+					console.log('ERROR: cannot parse example.', data);
 					return;
 				}
 				var html = tmp[1] ? $.trim(tmp[1]) : '';
 				var js   = tmp[2] ? $.trim(tmp[2]) : '';
 				var css  = tmp[3] ? $.trim(tmp[3]) : '';
 				var json = tmp[4] ? $.trim(tmp[4]) : '';
+				js = js.replace(/^<script[^>]*>/, '').replace(/<\/script>$/, '');
+				js = $.trim(js);
+				css = css.replace(/^<style[^>]*>/, '').replace(/<\/style>$/, '');
+				css = $.trim(css);
+				json = json.replace(/^<script[^>]*>/, '').replace(/<\/script>$/, '');
+				json = $.trim(json);
 				w2ui['main_layout'].content('main', tmp[0]);
 				$('#example_view').html(
 						'<h2>Preview</h2>'+ html + 
-						'<script type="text/javascript">' + js +'</script>' + 
+						'<script type="text/javascript">' + js + '</script>' + 
 						'<style>' + css + '</style>');
 				var code = '<!DOCTYPE html>\n'+
 						   '<html>\n'+
@@ -236,15 +242,32 @@ $(function () {
 		}
 	}));
 
+if (0) {
+	// register a handler for when the display itself resizes:
+	var h_resize = null;
+	function resizeHandler(e) {
+		h_resize = null;
+		main_layout.resize();
+	}
+	$(window).on('resize', function (e) {
+		// some browsers fire a huge series of resize events and we don't want to slow down
+		if (h_resize) clearTimeout(h_resize);
+		h_resize = setTimeout(function() {
+			resizeHandler(e);
+		}, 200);
+	});
+}
+
 	// check hash
 	setTimeout(function () { 
 		var tmp = String(document.location.hash).split('/');
-		switch(tmp[0]) {
+		switch (tmp[0]) {
 			default:
 			case '#!combo':
 				w2ui['demo-sidebar'].expand('combo');
 				w2ui['demo-sidebar'].click(tmp[1] || 'combo-1');
 				break;
+
 			case '#!layout':
 				w2ui['demo-sidebar'].expand('layout');
 				w2ui['demo-sidebar'].click(tmp[1] || 'layout-1');
@@ -269,6 +292,7 @@ $(function () {
 				w2ui['demo-sidebar'].expand('listview');
 				w2ui['demo-sidebar'].click(tmp[1] || 'listview-1');
 				break;
+
 			case '#!tabs':
 				w2ui['demo-sidebar'].expand('tabs');
 				w2ui['demo-sidebar'].click(tmp[1] || 'tabs-1');
@@ -282,6 +306,11 @@ $(function () {
 			case '#!forms':
 				w2ui['demo-sidebar'].expand('forms');
 				w2ui['demo-sidebar'].click(tmp[1] || 'forms-1');
+				break;
+
+			case '#!extras':
+				w2ui['demo-sidebar'].expand('extras');
+				w2ui['demo-sidebar'].click(tmp[1] || 'extras-1');
 				break;
 
 			case '#!utils':

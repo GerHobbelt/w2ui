@@ -88,7 +88,8 @@ var w2utils = (function () {
 		getSize			: getSize,
 		scrollBarSize	: scrollBarSize,
 		checkName		: checkName,
-		checkUniqueId	: checkUniqueId
+		checkUniqueId	: checkUniqueId,
+		deepCopy		: deepCopy
 	};
 	return obj;
 
@@ -929,7 +930,7 @@ var w2utils = (function () {
 			async	: false,
 			cache	: false,
 			success : function (data, status, xhr) {
-				w2utils.settings = $.extend(true, w2utils.settings, data);
+				w2utils.settings = w2utils.deepCopy(w2utils.settings, data);
 				// apply translation to some prototype functions
 				var p = w2obj.grid.prototype;
 				for (var b in p.buttons) {
@@ -974,7 +975,7 @@ var w2utils = (function () {
 			return false;
 		}
 		return true;
-	};
+	}
 
 	function checkUniqueId (id, items, itemsDecription, objName) { // was w2checkUniqueId
 		if (!$.isArray(items)) items = [items];
@@ -985,9 +986,113 @@ var w2utils = (function () {
 			}
 		}
 		return true;
-	};
+	}
 
 
+	// Creates a deep clone of the src series into dst and returns the updated dst.
+	//
+	// This is similar to $.extend(true, dst, src, ...) except that:
+	// 1) any 'owner' attribute is referenced verbatim, i.e. is NOT cloned 
+	//    but kept as a proper JavaScript reference in order to keep 
+	//    parent/child chains intact.
+	// 2) when the clone depth is getting out of hand, an error is thrown.
+	//    $.extend() would simply cause an infinite loop and crash 
+	//    the JavaScript engine under such circumstances.
+	function deepCopy(dst, src /* ... */) {
+		var args = Array.prototype.slice.call(arguments, 0);
+		var reftable = [];
+		var dst = args.shift();
+		if (typeof dst !== 'object') {
+			args.unshift(args);
+			dst = {};
+		}
+		for (var i = 0, len = args.length; i < len; i++) {
+			__deepCopy(0, dst, args[i]);
+		}
+		return dst;
+
+		function __deepCopy(depth, dst, src) {
+			if (depth > 10) {
+				throw new Error('deepCopy going nuts on a cyclic ref?');
+			}
+			var el, obj, obj, i, j;
+			if (src && typeof src === 'object') {
+				if (reftable.indexOf(src) !== -1) {
+					throw new Error('deepCopy going nuts on a cyclic ref!');
+				}
+				reftable.push(src);
+				for (i in src) {
+					el = src[i];
+					if (i === 'owner') {
+						dst[i] = el;
+					} else if (typeof el === 'object' && el !== null) {
+						if (reftable.indexOf(el) !== -1) {
+							throw new Error('deepCopy going nuts on a cyclic ref!');
+						}
+						if ($.isArray(el)) {
+							reftable.push(el);
+							var da = dst[i] || [];
+							for (j in el) {
+								if (j == +j) {
+									j = +j;
+									v = el[j];
+									if (typeof v === 'object' && v !== null) {
+										obj = {};
+										__deepCopy(depth + 1, obj, v);
+										da[j] = obj;
+									} else {
+										da[j] = v;
+									}
+								}
+							}
+							dst[i] = da;
+							reftable.pop();
+						} else {
+							obj = dst[i] || {};
+							__deepCopy(depth + 1, obj, el);
+							dst[i] = obj;
+						}
+					} else {
+						dst[i] = el;
+					}
+				}
+				reftable.pop();
+			} else if (typeof src === 'function') {
+				if (reftable.indexOf(src) !== -1) {
+					throw new Error('deepCopy going nuts on a cyclic ref!');
+				}
+				reftable.push(src);
+				var src2 = src.prototype;
+				for (i in src2) {
+					el = src2[i];
+					if (i === undefined) {
+						continue;
+					} else if (typeof el === 'object' && el !== null) {
+						obj = dst[i] || {};
+						__deepCopy(depth + 1, obj, el);
+						dst[i] = obj;
+					} else {
+						dst[i] = el;
+					}
+				}
+				for (i in src) {
+					el = src[i];
+					if (i === undefined) {
+						continue;
+					} else if (typeof el === 'object' && el !== null) {
+						obj = dst[i] || {};
+						__deepCopy(depth + 1, obj, el);
+						dst[i] = obj;
+					} else {
+						dst[i] = el;
+					}
+				}
+				reftable.pop();
+			} else if (src != null) {
+				throw new Error('deepCopy does not tolerate non-object/array parameters to extend the destination object!');
+			}
+		}
+	}
 
 })();
 
@@ -1060,7 +1165,7 @@ w2utils.event = {
 		var funName = 'on' + eventData.type.substr(0,1).toUpperCase() + eventData.type.substr(1);
 		var funPhasedName = 'on' + eventData.phase.substr(0,1).toUpperCase() + eventData.phase.substr(1) + eventData.type.substr(0,1).toUpperCase() + eventData.type.substr(1);
 		if (typeof this[funName] === 'function' && typeof this[funPhasedName] === 'function') {
-			alert("ERROR in Main Object: user specified both basic " + funName + " and new " + funPhasedName + " event handlers; only the latter will execute!");
+			console.log("ERROR in Main Object: user specified both basic " + funName + " and new " + funPhasedName + " event handlers; only the latter will execute!");
 		}
 		// test for both onEvent and onBeforeEvent/onAfterEvent handlers being specified: exec the latter if both are specified.
 		if ((eventData.phase === 'before' && typeof this[funName] === 'function') || typeof this[funPhasedName] === 'function') {
@@ -1079,7 +1184,7 @@ w2utils.event = {
 		// item object events
 		if (eventData.object != null &&
 				typeof eventData.object[funName] === 'function' && typeof eventData.object[funPhasedName] === 'function') {
-			alert("ERROR in Item Object: user specified both basic " + funName + " and new " + funPhasedName + " event handlers; only the latter will execute!");
+			console.log("ERROR in Item Object: user specified both basic " + funName + " and new " + funPhasedName + " event handlers; only the latter will execute!");
 		}
 		if (eventData.object != null &&
 				((eventData.phase == 'before' && typeof eventData.object[funName] === 'function') || typeof eventData.object[funPhasedName] === 'function')) {
@@ -1096,7 +1201,7 @@ w2utils.event = {
 			if (eventData.isStopped === true || eventData.stop === true) return eventData;
 		}
 		// execute onComplete
-		if (eventData.phase === 'after' && typeof eventData.onComplete === 'function')	eventData.onComplete.call(this, eventData);
+		if (eventData.phase === 'after' && typeof eventData.onComplete === 'function') eventData.onComplete.call(this, eventData);
 
 		return eventData;
 	}
@@ -1122,8 +1227,8 @@ w2utils.keyboard = (function (obj) {
 	return obj;
 
 	function init() {
-		$(document).on('keydown', keydown);
-		$(document).on('mousedown', mousedown);
+		$(document).on('keydown.w2ui', keydown);
+		$(document).on('mousedown.w2ui', mousedown);
 	}
 
 	function keydown (event) {
@@ -1432,7 +1537,7 @@ w2utils.keyboard = (function (obj) {
 					setTimeout(function () { div2.find('div.menu').css('overflow-y', 'auto'); }, 10);
 				}
 				// alignment
-				switch(options.align) {
+				switch (options.align) {
 					case 'both':
 						options.left = 17;
 						if (options.width === 0) options.width = w2utils.getSize($(obj), 'width');
@@ -1611,7 +1716,7 @@ w2utils.keyboard = (function (obj) {
 			var search	= this.value;
 			var key		= event.keyCode;
 			var cancel	= false;
-			switch(key) {
+			switch (key) {
 				case 13: // enter
 					$('#w2ui-overlay'+ name).remove();
 					$.fn.w2menuHandler(event, options.index);
@@ -1677,8 +1782,8 @@ w2utils.keyboard = (function (obj) {
 			}
 			var count		= 0;
 			var menu_html	= '<table cellspacing="0" cellpadding="0" class="w2ui-drop-menu">';
-			var img = null, icon = null;
 			for (var f = 0; f < options.items.length; f++) {
+				var img = null, icon = null;
 				var mitem = options.items[f];
 				if (typeof mitem === 'string') {
 					mitem = { id: mitem, text: mitem };
