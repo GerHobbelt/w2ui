@@ -4225,10 +4225,10 @@
 					var col  = obj.columns[i];
 					var colg = {};
 					if (i == id) {
-						id = id + (typeof obj.columnGroups[ii] != 'undefined' ? parseInt(obj.columnGroups[ii].span) : 0);
+						id = id + (typeof obj.columnGroups[ii] !== 'undefined' ? parseInt(obj.columnGroups[ii].span) : 0);
 						ii++;
 					}
-					if (typeof obj.columnGroups[ii - 1] != 'undefined') var colg = obj.columnGroups[ii - 1];
+					if (typeof obj.columnGroups[ii - 1] !== 'undefined') var colg = obj.columnGroups[ii - 1];
 					if (col.hidden) continue;
 					var sortStyle = '';
 					for (var si in obj.sortData) {
