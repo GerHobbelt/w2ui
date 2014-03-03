@@ -79,14 +79,14 @@ sudo npm install uglify-js@1 -g
 
 ## File Structure
 
-This repository holds a lot of auxiliary files. 
-
 ```
-- css 			- compiled CSS files 
+- dist 			- compiled JS files, plus compiled CSS files 
+- src 			- source JS files
+  - kickstart 		- copy of another project used with the demos (not part of w2ui itself)
   - less 		- LESS files (source for css)
 - demos 		- all demos, same as on the website
-- js 			- compiled JS files, plus additional JS libraries
-- src 			- source JS files
+- libs			- auxilary libraries (jquery, codemirror, etc.) used in the demos (not part of w2ui itself)
+- server		- example implementations for a server implementation communicating with w2ui instances
 - test 			- feature testing files
 ```
 

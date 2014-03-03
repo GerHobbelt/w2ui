@@ -44,7 +44,7 @@
 		w2utils.deepCopy(this, w2obj.layout, options);
 	};
 
-	var w2layout_panels = ['top', 'left', 'main', 'preview', 'right', 'bottom'];
+	/* @const */ var w2layout_panels = ['top', 'left', 'main', 'preview', 'right', 'bottom'];
 
 	// ====================================================
 	// -- Registers as a jQuery plugin
