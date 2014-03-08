@@ -537,7 +537,7 @@
 				var imgClass = (item.icon !== null && typeof item.icon !== 'undefined') ? ' '+item.icon : ' icon-none';
 				if (item.img !== null && typeof item.img !== 'undefined') imgClass = ' w2ui-icon '+item.img;
 
-				var withDescription = (typeof item.description !== undefined && item.description !== '');
+				var withDescription = (typeof item.description !== 'undefined' && item.description !== '');
 				var withExtra = (obj.extraCols.length > 0);
 				var rslt = getItemTemplate(withDescription, withExtra);
 				rslt.id = obj.itemNodeId(item.id);
@@ -643,7 +643,7 @@
 			var time = (new Date()).getTime();
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'render', target: this.name, box: box });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default action
 			if (typeof box !== 'undefined' && box !== null && this.box !== box) {
 				if (this.lastItm) {
@@ -680,7 +680,7 @@
 		destroy: function () {
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'destroy', target: this.name });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// clean up
 			if (this.box) {
 				this.lastItm = null;

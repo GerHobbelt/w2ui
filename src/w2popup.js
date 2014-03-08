@@ -37,7 +37,7 @@ var w2popup = {};
 		if (method === 'load' && typeof options === 'string') {
 			options = $.extend({ url: options }, arguments.length > 2 ? arguments[2] : {});
 		}
-		if (method === 'open' && typeof options.url != 'undefined') method = 'load';
+		if (method === 'open' && options.url != null) method = 'load';
 		options = options || {};
 		// load options from markup
 		var dlgOptions = {};
@@ -91,6 +91,7 @@ var w2popup = {};
 		onClose		: null,
 		onMax		: null,
 		onMin		: null,
+		onToggle	: null,
 		onKeydown   : null,
 
 		open: function (options) {
@@ -114,7 +115,8 @@ var w2popup = {};
 				'min',
 				'open',
 				'close',
-				'keydown'
+				'keydown',
+                'toggle'
 			];
 			var event_phases = [ 
 				'',
@@ -261,34 +263,36 @@ var w2popup = {};
 			$('#w2ui-popup .w2ui-msg-title').on('mousedown', function (event) { mvStart(event); })
 
 			// handlers
-			function mvStart(event) {
-				if (!event) event = window.event;
+			function mvStart(evnt) {
+				if (!evnt) evnt = window.event;
 				if (!window.addEventListener) { window.document.attachEvent('onselectstart', function() { return false; } ); }
 				w2popup.status = 'moving';
 				tmp.resizing = true;
-				tmp.tmp_x = event.screenX;
-				tmp.tmp_y = event.screenY;
+				tmp.x = evnt.screenX;
+				tmp.y = evnt.screenY;
+				tmp.pos_x = $('#w2ui-popup').position().left;
+				tmp.pos_y = $('#w2ui-popup').position().top;
 				w2popup.lock({ opacity: 0 });
 				$(document).on('mousemove', tmp.mvMove);
 				$(document).on('mouseup', tmp.mvStop);
-				if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;
-				if (event.preventDefault) event.preventDefault(); else return false;
+				if (evnt.stopPropagation) evnt.stopPropagation(); else evnt.cancelBubble = true;
+				if (evnt.preventDefault) evnt.preventDefault(); else return false;
 			}
 
 			function mvMove(evnt) {
 				if (tmp.resizing != true) return;
 				if (!evnt) evnt = window.event;
-				tmp.tmp_div_x = (evnt.screenX - tmp.tmp_x);
-				tmp.tmp_div_y = (evnt.screenY - tmp.tmp_y);
+				tmp.div_x = evnt.screenX - tmp.x;
+				tmp.div_y = evnt.screenY - tmp.y;
 				$('#w2ui-popup').css({
 					'-webkit-transition': 'none',
-					'-webkit-transform': 'translate3d(' + tmp.tmp_div_x + 'px, ' + tmp.tmp_div_y + 'px, 0px)',
+					'-webkit-transform': 'translate3d('+ tmp.div_x +'px, '+ tmp.div_y +'px, 0px)',
 					'-moz-transition': 'none',
-					'-moz-transform': 'translate(' + tmp.tmp_div_x + 'px, ' + tmp.tmp_div_y + 'px)',
+					'-moz-transform': 'translate('+ tmp.div_x +'px, '+ tmp.div_y +'px)',
 					'-ms-transition': 'none',
-					'-ms-transform': 'translate(' + tmp.tmp_div_x + 'px, ' + tmp.tmp_div_y + 'px)',
+					'-ms-transform': 'translate('+ tmp.div_x +'px, '+ tmp.div_y +'px)',
 					'-o-transition': 'none',
-					'-o-transform': 'translate(' + tmp.tmp_div_x + 'px, ' + tmp.tmp_div_y + 'px)'
+					'-o-transform': 'translate('+ tmp.div_x +'px, '+ tmp.div_y +'px)'
 				});
 			}
 
@@ -296,9 +300,11 @@ var w2popup = {};
 				if (tmp.resizing != true) return;
 				if (!evnt) evnt = window.event;
 				w2popup.status = 'open';
-				tmp.tmp_div_x = (evnt.screenX - tmp.tmp_x);
-				tmp.tmp_div_y = (evnt.screenY - tmp.tmp_y);
+				tmp.div_x = (evnt.screenX - tmp.x);
+				tmp.div_y = (evnt.screenY - tmp.y);
 				$('#w2ui-popup').css({
+					'left': (tmp.pos_x + tmp.div_x) + 'px',
+					'top':	(tmp.pos_y  + tmp.div_y) + 'px',
 					'-webkit-transition': 'none',
 					'-webkit-transform': 'translate3d(0px, 0px, 0px)',
 					'-moz-transition': 'none',
@@ -307,8 +313,6 @@ var w2popup = {};
 					'-ms-transform': 'translate(0px, 0px)',
 					'-o-transition': 'none',
 					'-o-transform': 'translate(0px, 0px)',
-					'left': (parseInt($('#w2ui-popup').css('left')) + parseInt(tmp.tmp_div_x)) + 'px',
-					'top':	(parseInt($('#w2ui-popup').css('top'))  + parseInt(tmp.tmp_div_y)) + 'px'
 				});
 				tmp.resizing = false;
 				$(document).off('mousemove', tmp.mvMove);
@@ -369,8 +373,17 @@ var w2popup = {};
 		},
 
 		toggle: function () {
+			var obj		= this;
 			var options = $('#w2ui-popup').data('options');
+			// trigger event
+			var eventData = this.trigger({ phase: 'before', type: 'toggle', target: 'popup', options: options });
+			if (eventData.isCancelled === true) return;
+			// defatul action
 			if (options.maximized === true) w2popup.min(); else w2popup.max();
+			// event after
+			setTimeout(function () {
+				obj.trigger($.extend(eventData, { phase: 'after'}));
+			}, 250);
 		},
 
 		max: function () {
@@ -380,14 +393,13 @@ var w2popup = {};
 			// trigger event
 			var eventData = this.trigger({ phase: 'before', type: 'max', target: 'popup', options: options });
 			if (eventData.isCancelled === true) return;
-			w2popup.status = 'resizing';
 			// default behavior
-			options.maximized = true;
+			w2popup.status 	  = 'resizing';
 			options.prevSize  = $('#w2ui-popup').css('width')+':'+$('#w2ui-popup').css('height');
-			$('#w2ui-popup').data('options', options);
 			// do resize
 			w2popup.resize(10000, 10000, function () {
 				w2popup.status = 'open';
+				options.maximized = true;
 				obj.trigger($.extend(eventData, { phase: 'after'}));
 			});
 		},
@@ -400,14 +412,13 @@ var w2popup = {};
 			// trigger event
 			var eventData = this.trigger({ phase: 'before', type: 'min', target: 'popup', options: options });
 			if (eventData.isCancelled === true) return;
-			w2popup.status = 'resizing';
 			// default behavior
-			options.maximized = false;
-			options.prevSize  = null;
-			$('#w2ui-popup').data('options', options);
+			w2popup.status = 'resizing';
 			// do resize
 			w2popup.resize(size[0], size[1], function () {
 				w2popup.status = 'open';
+				options.maximized = false;
+				options.prevSize  = null;
 				obj.trigger($.extend(eventData, { phase: 'after'}));
 			});
 		},
