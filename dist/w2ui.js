@@ -1418,6 +1418,7 @@ w2utils.keyboard = (function (obj) {
 			'class'		: '',		// additional class name for main dvi
 			onShow		: null,		// event on show
 			onHide		: null,		// event on hide
+			openAbove	: false,	// show abover control
 			tmp			: {}
 		};
 		if (!$.isPlainObject(options)) options = {};
@@ -1571,7 +1572,7 @@ w2utils.keyboard = (function (obj) {
 				// $(window).height() - has a problem in FF20
 				var maxHeight = window.innerHeight + $(document).scrollTop() - div2.offset().top - 7;
 				var maxWidth  = window.innerWidth + $(document).scrollLeft() - div2.offset().left - 7;
-				if (maxHeight > -50 && maxHeight < 210) {
+				if ((maxHeight > -50 && maxHeight < 210) || options.openAbove === true) {
 					// show on top
 					maxHeight = div2.offset().top - $(document).scrollTop() - 7;
 					if (options.maxHeight && maxHeight > options.maxHeight) maxHeight = options.maxHeight;
@@ -1834,6 +1835,7 @@ w2utils.keyboard = (function (obj) {
 	};
 })();
 
+
 /************************************************************************
 *   Library: Web 2.0 UI for jQuery (using prototypical inheritance)
 *   - Following objects defined
@@ -1860,6 +1862,7 @@ w2utils.keyboard = (function (obj) {
 *	- add showExtra, KickIn Infinite scroll when so many records
 *	- get rid of this.buffered
 *	- allow this.total to be unknown (-1)
+*	- after edit stay on the same record 
 *
 * == 1.4 changes
 *	- for search fields one should be able to pass w2field options
@@ -3316,7 +3319,7 @@ w2utils.keyboard = (function (obj) {
 			// event before
 			if (cmd == 'get-records') {
 				var eventData = this.trigger({ phase: 'before', type: 'request', target: this.name, url: url, postData: params });
-				if (eventData.isCancelled === true) { if (typeof callBack == 'function') callBack(); return false; }
+				if (eventData.isCancelled === true) { if (typeof callBack == 'function') callBack(); return; }
 			} else {
 				var eventData = { url: url, postData: params };
 			}
@@ -3376,7 +3379,7 @@ w2utils.keyboard = (function (obj) {
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: event_name, xhr: this.last.xhr, status: status });
 			if (eventData.isCancelled === true) {
 				if (typeof callBack == 'function') callBack({ status: 'error', message: 'Request aborted.' });
-				return false;
+				return;
 			}
 			// parse server response
 			var data;
@@ -3471,7 +3474,7 @@ w2utils.keyboard = (function (obj) {
 			var eventData = this.trigger({ target: this.name, type: 'error', message: msg , xhr: this.last.xhr });
 			if (eventData.isCancelled === true) {
 				if (typeof callBack == 'function') callBack();
-				return false;
+				return;
 			}
 			w2alert(msg, 'Error');
 			// event after
@@ -3510,7 +3513,7 @@ w2utils.keyboard = (function (obj) {
 			var changes = this.getChanges();
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'submit', changes: changes });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			var url = (typeof this.url != 'object' ? this.url : this.url.save);
 			if (url) {
 				this.request('save-records', { 'changes' : eventData.changes }, null,
@@ -3760,7 +3763,7 @@ w2utils.keyboard = (function (obj) {
 			var obj = this;
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'delete', force: force });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			force = eventData.force;
 			// default action
 			var recs = this.getSelection();
@@ -3818,7 +3821,7 @@ w2utils.keyboard = (function (obj) {
 			}
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'click', recid: recid, column: column, originalEvent: event });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// if it is subgrid unselect top grid
 			var parent = $('#grid_'+ this.name +'_rec_'+ w2utils.escapeId(recid)).parents('tr');
 			if (parent.length > 0 && String(parent.attr('id')).indexOf('expanded_row') != -1) {
@@ -3906,7 +3909,7 @@ w2utils.keyboard = (function (obj) {
 		columnClick: function (field, event) {
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'columnClick', target: this.name, field: field, originalEvent: event });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default behaviour
 			this.sort(field, null, (event && (event.ctrlKey || event.metaKey) ? true : false) );
 			// event after
@@ -3919,7 +3922,7 @@ w2utils.keyboard = (function (obj) {
 			if (obj.keyboard !== true) return;
 			// trigger event
 			var eventData = obj.trigger({ phase: 'before', type: 'keydown', target: obj.name, originalEvent: event });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default behavior
 			var empty	= false;
 			var records = $('#grid_'+ obj.name +'_records');
@@ -4329,7 +4332,7 @@ w2utils.keyboard = (function (obj) {
 			}
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'dblClick', recid: recid, column: column, originalEvent: event });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default action
 			this.selectNone();
 			var col = this.columns[column];
@@ -4369,7 +4372,7 @@ w2utils.keyboard = (function (obj) {
 				box_id: 'grid_'+ this.name +'_rec_'+ id +'_expanded', ready: ready });
 			if (eventData.isCancelled === true) {
 				$('#grid_'+ this.name +'_rec_'+ id +'_expanded_row').remove();
-				return false;
+				return;
 			}
 			// default action
 			$('#grid_'+ this.name +'_rec_'+ id).attr('expanded', 'yes').addClass('w2ui-expanded');
@@ -4400,7 +4403,7 @@ w2utils.keyboard = (function (obj) {
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'collapse', target: this.name, recid: recid,
 				box_id: 'grid_'+ this.name +'_rec_'+ id +'_expanded' });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default action
 			$('#grid_'+ this.name +'_rec_'+ id).removeAttr('expanded').removeClass('w2ui-expanded');
 			$('#grid_'+ this.name +'_rec_'+ id +'_expanded').css('opacity', 0);
@@ -4421,7 +4424,7 @@ w2utils.keyboard = (function (obj) {
 		sort: function (field, direction, multiField) { // if no params - clears sort
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'sort', target: this.name, field: field, direction: direction, multiField: multiField });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// check if needed to quit
 			if (typeof field != 'undefined') {
 				// default action
@@ -4568,7 +4571,7 @@ w2utils.keyboard = (function (obj) {
 				.css('height', $(this.box).height());
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'resize', target: this.name });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// resize
 			obj.resizeBoxes();
 			obj.resizeRecords();
@@ -4623,7 +4626,7 @@ w2utils.keyboard = (function (obj) {
 			if (!this.box) return;
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'refresh' });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// -- header
 			if (this.show.header) {
 				$('#grid_'+ this.name +'_header').html(this.header +'&nbsp;').show();
@@ -4763,7 +4766,7 @@ w2utils.keyboard = (function (obj) {
 			if (this.last.sortData == null) this.last.sortData = this.sortData;
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'render', box: box });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// insert Elements
 			$(this.box)
 				.attr('name', this.name)
@@ -4933,7 +4936,7 @@ w2utils.keyboard = (function (obj) {
 		destroy: function () {
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'destroy' });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// remove events
 			$(window).off('resize', this.tmp_resize);
 			// clean up
@@ -5246,7 +5249,7 @@ w2utils.keyboard = (function (obj) {
 		columnOnOff: function (el, event, field, value) {
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'columnOnOff', checkbox: el, field: field, originalEvent: event });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// regular processing
 			var obj = this;
 			// collapse expanded rows
@@ -5367,7 +5370,7 @@ w2utils.keyboard = (function (obj) {
 				var obj = this;
 				this.toolbar.on('click', function (event) {
 					var eventData = obj.trigger({ phase: 'before', type: 'toolbar', target: event.target, originalEvent: event });
-					if (eventData.isCancelled === true) return false;
+					if (eventData.isCancelled === true) return;
 					var id = event.target;
 					switch (id) {
 						case 'reload':
@@ -6061,10 +6064,10 @@ w2utils.keyboard = (function (obj) {
 					var col  = obj.columns[i];
 					var colg = {};
 					if (i == id) {
-						id = id + (typeof obj.columnGroups[ii] != 'undefined' ? parseInt(obj.columnGroups[ii].span) : 0);
+						id = id + (typeof obj.columnGroups[ii] !== 'undefined' ? parseInt(obj.columnGroups[ii].span) : 0);
 						ii++;
 					}
-					if (typeof obj.columnGroups[ii - 1] != 'undefined') var colg = obj.columnGroups[ii - 1];
+					if (typeof obj.columnGroups[ii - 1] !== 'undefined') var colg = obj.columnGroups[ii - 1];
 					if (col.hidden) continue;
 					var sortStyle = '';
 					for (var si in obj.sortData) {
@@ -6565,6 +6568,7 @@ w2utils.keyboard = (function (obj) {
 	$.extend(w2grid.prototype, w2utils.event);
 	w2obj.grid = w2grid;
 })();
+
 /************************************************************************
 *	Library: Web 2.0 UI for jQuery (using prototypical inheritance)
 *	- Following objects defined
@@ -6611,7 +6615,7 @@ w2utils.keyboard = (function (obj) {
 		w2utils.deepCopy(this, w2obj.layout, options);
 	};
 
-	var w2layout_panels = ['top', 'left', 'main', 'preview', 'right', 'bottom'];
+	/* @const */ var w2layout_panels = ['top', 'left', 'main', 'preview', 'right', 'bottom'];
 
 	// ====================================================
 	// -- Registers as a jQuery plugin
@@ -6821,7 +6825,7 @@ w2utils.keyboard = (function (obj) {
 			var obj = this;
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'show', target: panel, object: this.get(panel), immediate: immediate });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 
 			var p = obj.get(panel);
 			if (p === null) return false;
@@ -6865,7 +6869,7 @@ w2utils.keyboard = (function (obj) {
 			var obj = this;
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'hide', target: panel, object: this.get(panel), immediate: immediate });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 
 			var p = obj.get(panel);
 			if (p === null) return false;
@@ -6981,7 +6985,7 @@ w2utils.keyboard = (function (obj) {
 			var time = (new Date()).getTime();
 			// event before
 			var eventData = obj.trigger({ phase: 'before', type: 'render', target: obj.name, box: box });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 
 			if (typeof box != 'undefined' && box !== null) {
 				if ($(obj.box).find('#layout_'+ obj.name +'_panel_main').length > 0) {
@@ -7128,7 +7132,7 @@ w2utils.keyboard = (function (obj) {
 				var tmp = obj.tmp.resize;
 				var eventData = obj.trigger({ phase: 'before', type: 'resizing', target: obj.name, object: panel, originalEvent: evnt,
 					panel: tmp ? tmp.type : 'all', diff_x: tmp ? tmp.diff_x : 0, diff_y: tmp ? tmp.diff_y : 0 });
-				if (eventData.isCancelled === true) return false;
+				if (eventData.isCancelled === true) return;
 
 				var p			= $('#layout_'+ obj.name + '_resizer_'+ tmp.type);
 				var resize_x	= (evnt.screenX - tmp.x);
@@ -7286,7 +7290,7 @@ w2utils.keyboard = (function (obj) {
 			var tmp = this.tmp.resize;
 			var eventData = this.trigger({ phase: 'before', type: 'resize', target: this.name,
 				panel: tmp ? tmp.type : 'all', diff_x: tmp ? tmp.diff_x : 0, diff_y: tmp ? tmp.diff_y : 0  });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			if (this.padding < 0) this.padding = 0;
 
 			// layout itself
@@ -7360,7 +7364,7 @@ w2utils.keyboard = (function (obj) {
 					}).off('mousedown').on('mousedown', function (event) {
 						// event before
 						var eventData = obj.trigger({ phase: 'before', type: 'resizerClick', target: 'top', originalEvent: event });
-						if (eventData.isCancelled === true) return false;
+						if (eventData.isCancelled === true) return;
 						// default action
 						w2ui[obj.name].tmp.events.resizeStart('top', event);
 						// event after
@@ -7403,7 +7407,7 @@ w2utils.keyboard = (function (obj) {
 					}).off('mousedown').on('mousedown', function (event) {
 						// event before
 						var eventData = obj.trigger({ phase: 'before', type: 'resizerClick', target: 'left', originalEvent: event });
-						if (eventData.isCancelled === true) return false;
+						if (eventData.isCancelled === true) return;
 						// default action
 						w2ui[obj.name].tmp.events.resizeStart('left', event);
 						// event after
@@ -7445,7 +7449,7 @@ w2utils.keyboard = (function (obj) {
 					}).off('mousedown').on('mousedown', function (event) {
 						// event before
 						var eventData = obj.trigger({ phase: 'before', type: 'resizerClick', target: 'right', originalEvent: event });
-						if (eventData.isCancelled === true) return false;
+						if (eventData.isCancelled === true) return;
 						// default action
 						w2ui[obj.name].tmp.events.resizeStart('right', event);
 						// event after
@@ -7485,7 +7489,7 @@ w2utils.keyboard = (function (obj) {
 					}).off('mousedown').on('mousedown', function (event) {
 						// event before
 						var eventData = obj.trigger({ phase: 'before', type: 'resizerClick', target: 'bottom', originalEvent: event });
-						if (eventData.isCancelled === true) return false;
+						if (eventData.isCancelled === true) return;
 						// default action
 						w2ui[obj.name].tmp.events.resizeStart('bottom', event);
 						// event after
@@ -7548,7 +7552,7 @@ w2utils.keyboard = (function (obj) {
 					}).off('mousedown').on('mousedown', function (event) {
 						// event before
 						var eventData = obj.trigger({ phase: 'before', type: 'resizerClick', target: 'preview', originalEvent: event });
-						if (eventData.isCancelled === true) return false;
+						if (eventData.isCancelled === true) return;
 						// default action
 						w2ui[obj.name].tmp.events.resizeStart('preview', event);
 						// event after
@@ -7601,7 +7605,7 @@ w2utils.keyboard = (function (obj) {
 		destroy: function () {
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'destroy', target: this.name });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			if (typeof w2ui[this.name] == 'undefined') return false;
 			// clean up
 			if ($(this.box).find('#layout_'+ this.name +'_panel_main').length > 0) {
@@ -7618,7 +7622,7 @@ w2utils.keyboard = (function (obj) {
 		},
 
 		lock: function (panel, msg, showSpinner) {
-			if ($.inArray(String(panel), w2layout_panels) == -1) {
+			if (w2layout_panels.indexOf(panel) == -1) {
 				console.log('ERROR: First parameter needs to be the a valid panel name.');
 				return;
 			}
@@ -7628,7 +7632,7 @@ w2utils.keyboard = (function (obj) {
 		},
 
 		unlock: function (panel) {
-			if ($.inArray(String(panel), w2layout_panels) == -1) {
+			if (w2layout_panels.indexOf(panel) == -1) {
 				console.log('ERROR: First parameter needs to be the a valid panel name.');
 				return;
 			}
@@ -7640,6 +7644,7 @@ w2utils.keyboard = (function (obj) {
 	$.extend(w2layout.prototype, w2utils.event);
 	w2obj.layout = w2layout;
 })();
+
 /************************************************************************
 *   Library: Web 2.0 UI for jQuery (using prototypical inheritance)
 *   - Following objects defined
@@ -7679,7 +7684,7 @@ var w2popup = {};
 		if (method === 'load' && typeof options === 'string') {
 			options = $.extend({ url: options }, arguments.length > 2 ? arguments[2] : {});
 		}
-		if (method === 'open' && typeof options.url != 'undefined') method = 'load';
+		if (method === 'open' && options.url != null) method = 'load';
 		options = options || {};
 		// load options from markup
 		var dlgOptions = {};
@@ -7733,6 +7738,7 @@ var w2popup = {};
 		onClose		: null,
 		onMax		: null,
 		onMin		: null,
+		onToggle	: null,
 		onKeydown   : null,
 
 		open: function (options) {
@@ -7756,7 +7762,8 @@ var w2popup = {};
 				'min',
 				'open',
 				'close',
-				'keydown'
+				'keydown',
+                'toggle'
 			];
 			var event_phases = [ 
 				'',
@@ -7903,34 +7910,36 @@ var w2popup = {};
 			$('#w2ui-popup .w2ui-msg-title').on('mousedown', function (event) { mvStart(event); })
 
 			// handlers
-			function mvStart(event) {
-				if (!event) event = window.event;
+			function mvStart(evnt) {
+				if (!evnt) evnt = window.event;
 				if (!window.addEventListener) { window.document.attachEvent('onselectstart', function() { return false; } ); }
 				w2popup.status = 'moving';
 				tmp.resizing = true;
-				tmp.tmp_x = event.screenX;
-				tmp.tmp_y = event.screenY;
+				tmp.x = evnt.screenX;
+				tmp.y = evnt.screenY;
+				tmp.pos_x = $('#w2ui-popup').position().left;
+				tmp.pos_y = $('#w2ui-popup').position().top;
 				w2popup.lock({ opacity: 0 });
 				$(document).on('mousemove', tmp.mvMove);
 				$(document).on('mouseup', tmp.mvStop);
-				if (event.stopPropagation) event.stopPropagation(); else event.cancelBubble = true;
-				if (event.preventDefault) event.preventDefault(); else return false;
+				if (evnt.stopPropagation) evnt.stopPropagation(); else evnt.cancelBubble = true;
+				if (evnt.preventDefault) evnt.preventDefault(); else return false;
 			}
 
 			function mvMove(evnt) {
 				if (tmp.resizing != true) return;
 				if (!evnt) evnt = window.event;
-				tmp.tmp_div_x = (evnt.screenX - tmp.tmp_x);
-				tmp.tmp_div_y = (evnt.screenY - tmp.tmp_y);
+				tmp.div_x = evnt.screenX - tmp.x;
+				tmp.div_y = evnt.screenY - tmp.y;
 				$('#w2ui-popup').css({
 					'-webkit-transition': 'none',
-					'-webkit-transform': 'translate3d(' + tmp.tmp_div_x + 'px, ' + tmp.tmp_div_y + 'px, 0px)',
+					'-webkit-transform': 'translate3d('+ tmp.div_x +'px, '+ tmp.div_y +'px, 0px)',
 					'-moz-transition': 'none',
-					'-moz-transform': 'translate(' + tmp.tmp_div_x + 'px, ' + tmp.tmp_div_y + 'px)',
+					'-moz-transform': 'translate('+ tmp.div_x +'px, '+ tmp.div_y +'px)',
 					'-ms-transition': 'none',
-					'-ms-transform': 'translate(' + tmp.tmp_div_x + 'px, ' + tmp.tmp_div_y + 'px)',
+					'-ms-transform': 'translate('+ tmp.div_x +'px, '+ tmp.div_y +'px)',
 					'-o-transition': 'none',
-					'-o-transform': 'translate(' + tmp.tmp_div_x + 'px, ' + tmp.tmp_div_y + 'px)'
+					'-o-transform': 'translate('+ tmp.div_x +'px, '+ tmp.div_y +'px)'
 				});
 			}
 
@@ -7938,9 +7947,11 @@ var w2popup = {};
 				if (tmp.resizing != true) return;
 				if (!evnt) evnt = window.event;
 				w2popup.status = 'open';
-				tmp.tmp_div_x = (evnt.screenX - tmp.tmp_x);
-				tmp.tmp_div_y = (evnt.screenY - tmp.tmp_y);
+				tmp.div_x = (evnt.screenX - tmp.x);
+				tmp.div_y = (evnt.screenY - tmp.y);
 				$('#w2ui-popup').css({
+					'left': (tmp.pos_x + tmp.div_x) + 'px',
+					'top':	(tmp.pos_y  + tmp.div_y) + 'px',
 					'-webkit-transition': 'none',
 					'-webkit-transform': 'translate3d(0px, 0px, 0px)',
 					'-moz-transition': 'none',
@@ -7949,8 +7960,6 @@ var w2popup = {};
 					'-ms-transform': 'translate(0px, 0px)',
 					'-o-transition': 'none',
 					'-o-transform': 'translate(0px, 0px)',
-					'left': (parseInt($('#w2ui-popup').css('left')) + parseInt(tmp.tmp_div_x)) + 'px',
-					'top':	(parseInt($('#w2ui-popup').css('top'))  + parseInt(tmp.tmp_div_y)) + 'px'
 				});
 				tmp.resizing = false;
 				$(document).off('mousemove', tmp.mvMove);
@@ -8011,8 +8020,17 @@ var w2popup = {};
 		},
 
 		toggle: function () {
+			var obj		= this;
 			var options = $('#w2ui-popup').data('options');
+			// trigger event
+			var eventData = this.trigger({ phase: 'before', type: 'toggle', target: 'popup', options: options });
+			if (eventData.isCancelled === true) return;
+			// defatul action
 			if (options.maximized === true) w2popup.min(); else w2popup.max();
+			// event after
+			setTimeout(function () {
+				obj.trigger($.extend(eventData, { phase: 'after'}));
+			}, 250);
 		},
 
 		max: function () {
@@ -8022,14 +8040,13 @@ var w2popup = {};
 			// trigger event
 			var eventData = this.trigger({ phase: 'before', type: 'max', target: 'popup', options: options });
 			if (eventData.isCancelled === true) return;
-			w2popup.status = 'resizing';
 			// default behavior
-			options.maximized = true;
+			w2popup.status 	  = 'resizing';
 			options.prevSize  = $('#w2ui-popup').css('width')+':'+$('#w2ui-popup').css('height');
-			$('#w2ui-popup').data('options', options);
 			// do resize
 			w2popup.resize(10000, 10000, function () {
 				w2popup.status = 'open';
+				options.maximized = true;
 				obj.trigger($.extend(eventData, { phase: 'after'}));
 			});
 		},
@@ -8042,14 +8059,13 @@ var w2popup = {};
 			// trigger event
 			var eventData = this.trigger({ phase: 'before', type: 'min', target: 'popup', options: options });
 			if (eventData.isCancelled === true) return;
-			w2popup.status = 'resizing';
 			// default behavior
-			options.maximized = false;
-			options.prevSize  = null;
-			$('#w2ui-popup').data('options', options);
+			w2popup.status = 'resizing';
 			// do resize
 			w2popup.resize(size[0], size[1], function () {
 				w2popup.status = 'open';
+				options.maximized = false;
+				options.prevSize  = null;
 				obj.trigger($.extend(eventData, { phase: 'after'}));
 			});
 		},
@@ -8393,6 +8409,7 @@ var w2confirm = function (msg, title, callBack) {
 		});
 	}
 };
+
 /************************************************************************
 *	Library: Web 2.0 UI for jQuery (using prototypical inheritance)
 *	- Following objects defined
@@ -8602,7 +8619,7 @@ var w2confirm = function (msg, title, callBack) {
 			// if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'refresh', target: (typeof id !== 'undefined' ? id : this.name), object: this.get(id) });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			if (typeof id === 'undefined') {
 				// refresh all
 				for (var i = 0; i < this.tabs.length; i++) this.refresh(this.tabs[i].id);
@@ -8648,7 +8665,7 @@ var w2confirm = function (msg, title, callBack) {
 			var time = (new Date()).getTime();
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'render', target: this.name, box: box });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default action
 			// if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
 			if (typeof box !== 'undefined' && box !== null) {
@@ -8680,7 +8697,7 @@ var w2confirm = function (msg, title, callBack) {
 			var time = (new Date()).getTime();
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'resize', target: this.name });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 
 			// intentionaly blank
 
@@ -8692,7 +8709,7 @@ var w2confirm = function (msg, title, callBack) {
 		destroy: function () {
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'destroy', target: this.name });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// clean up
 			if ($(this.box).find('> table #tabs_'+ this.name + '_right').length > 0) {
 				$(this.box)
@@ -8713,7 +8730,7 @@ var w2confirm = function (msg, title, callBack) {
 			if (tab === null || tab.disabled) return false;
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'click', target: id, object: this.get(id), originalEvent: event });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default action
 			$(this.box).find('#tabs_'+ this.name +'_tab_'+ w2utils.escapeId(this.active) +' .w2ui-tab').removeClass('active');
 			this.active = tab.id;
@@ -8727,7 +8744,7 @@ var w2confirm = function (msg, title, callBack) {
 			if (tab === null || tab.disabled) return false;
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'close', target: id, object: this.get(id), originalEvent: event });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default action
 			var obj = this;
 			$(this.box).find('#tabs_'+ this.name +'_tab_'+ w2utils.escapeId(tab.id)).css({
@@ -8798,6 +8815,7 @@ var w2confirm = function (msg, title, callBack) {
 	$.extend(w2tabs.prototype, w2utils.event);
 	w2obj.tabs = w2tabs;
 })();
+
 
 /************************************************************************
 *	Library: Web 2.0 UI for jQuery (using prototypical inheritance)
@@ -9028,7 +9046,7 @@ var w2confirm = function (msg, title, callBack) {
 			var time = (new Date()).getTime();
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'render', target: this.name, box: box });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 
 			if (box != null) {
 				if ($(this.box).find('> table #tb_'+ this.name + '_right').length > 0) {
@@ -9072,7 +9090,7 @@ var w2confirm = function (msg, title, callBack) {
 			var time = (new Date()).getTime();
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'refresh', target: (typeof id !== 'undefined' ? id : this.name), item: this.get(id) });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 
 			if (id == null) {
 				// refresh all
@@ -9117,7 +9135,7 @@ var w2confirm = function (msg, title, callBack) {
 			var time = (new Date()).getTime();
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'resize', target: this.name });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 
 			// intentionaly blank
 
@@ -9129,7 +9147,7 @@ var w2confirm = function (msg, title, callBack) {
 		destroy: function () {
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'destroy', target: this.name });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// clean up
 			if ($(this.box).find('> table #tb_'+ this.name + '_right').length > 0) {
 				$(this.box)
@@ -9207,7 +9225,7 @@ var w2confirm = function (msg, title, callBack) {
 				// event before
 				var eventData = this.trigger({ phase: 'before', type: 'click', target: event.item.id + ':' + event.subItem.id, item: event.item,
 					subItem: event.subItem, originalEvent: event.originalEvent });
-				if (eventData.isCancelled === true) return false;
+				if (eventData.isCancelled === true) return;
 
 				// intentionaly blank
 
@@ -9225,7 +9243,7 @@ var w2confirm = function (msg, title, callBack) {
 				// event before
 				var eventData = this.trigger({ phase: 'before', type: 'click', target: (typeof id !== 'undefined' ? id : this.name),
 					item: this.get(id), originalEvent: event });
-				if (eventData.isCancelled === true) return false;
+				if (eventData.isCancelled === true) return;
 
 				var btn = $('#tb_'+ this.name +'_item_'+ w2utils.escapeId(it.id) +' table.w2ui-button');
 				btn.removeClass('down');
@@ -9294,6 +9312,7 @@ var w2confirm = function (msg, title, callBack) {
 	$.extend(w2toolbar.prototype, w2utils.event);
 	w2obj.toolbar = w2toolbar;
 })();
+
 
 /************************************************************************
 *	Library: Web 2.0 UI for jQuery (using prototypical inheritance)
@@ -9629,7 +9648,7 @@ var w2confirm = function (msg, title, callBack) {
 			var nd  = this.get(id);
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'collapse', target: id, object: nd });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default action
 			$(this.box).find('#node_'+ w2utils.escapeId(id) +'_sub').slideUp(200);
 			$(this.box).find('#node_'+ w2utils.escapeId(id) +' .w2ui-node-dots:first-child').html('<div class="w2ui-expand">+</div>');
@@ -9657,7 +9676,7 @@ var w2confirm = function (msg, title, callBack) {
 			var nd  = this.get(id);
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'expand', target: id, object: nd });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default action
 			$(this.box).find('#node_'+ w2utils.escapeId(id) +'_sub').slideDown(200);
 			$(this.box).find('#node_'+ w2utils.escapeId(id) +' .w2ui-node-dots:first-child').html('<div class="w2ui-expand">-</div>');
@@ -9707,7 +9726,7 @@ var w2confirm = function (msg, title, callBack) {
 					// restore selection
 					$(obj.box).find('#node_'+ w2utils.escapeId(id)).removeClass('w2ui-selected').find('.w2ui-icon').removeClass('w2ui-icon-selected');
 					$(obj.box).find('#node_'+ w2utils.escapeId(old)).addClass('w2ui-selected').find('.w2ui-icon').addClass('w2ui-icon-selected');
-					return false;
+					return;
 				}
 				// default action
 				if (old !== null) obj.get(old).selected = false;
@@ -9724,7 +9743,7 @@ var w2confirm = function (msg, title, callBack) {
 			if (!nd || obj.keyboard !== true) return;
 			// trigger event
 			var eventData = obj.trigger({ phase: 'before', type: 'keydown', target: obj.name, originalEvent: event });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default behaviour
 			if (event.keyCode == 13 || event.keyCode == 32) { // enter or space
 				if (nd.nodes.length > 0) obj.toggle(obj.selected);
@@ -9822,7 +9841,7 @@ var w2confirm = function (msg, title, callBack) {
 			var nd = this.get(id);
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'dblClick', target: id, originalEvent: event, object: nd });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default action
 			this.toggle(id);
 			// event after
@@ -9837,7 +9856,7 @@ var w2confirm = function (msg, title, callBack) {
 			setTimeout(function () {
 				// event before
 				var eventData = obj.trigger({ phase: 'before', type: 'contextMenu', target: id, originalEvent: event, object: nd });
-				if (eventData.isCancelled === true) return false;
+				if (eventData.isCancelled === true) return;
 				// default action
 				if (nd.group || nd.disabled) return;
 				if (obj.menu.length > 0) {
@@ -9857,7 +9876,7 @@ var w2confirm = function (msg, title, callBack) {
 			var obj = this;
 			// event before
 			var eventData = obj.trigger({ phase: 'before', type: 'menuClick', target: itemId, originalEvent: event, menuIndex: index, menuItem: obj.menu[index] });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default action
 			// -- empty
 			// event after
@@ -9868,7 +9887,7 @@ var w2confirm = function (msg, title, callBack) {
 			var time = (new Date()).getTime();
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'render', target: this.name, box: box });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default action
 			if (typeof box != 'undefined' && box !== null) {
 				if ($(this.box).find('> div > div.w2ui-sidebar-div').length > 0) {
@@ -9917,7 +9936,7 @@ var w2confirm = function (msg, title, callBack) {
 			// if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'refresh', target: (typeof id != 'undefined' ? id : this.name) });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// adjust top and bottom
 			if (this.topHTML !== '') {
 				$(this.box).find('.w2ui-sidebar-top').html(this.topHTML);
@@ -10026,7 +10045,7 @@ var w2confirm = function (msg, title, callBack) {
 			// if (window.getSelection) window.getSelection().removeAllRanges(); // clear selection
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'resize', target: this.name });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default action
 			$(this.box).css('overflow', 'hidden');	// container should have no overflow
 			//$(this.box).find('.w2ui-sidebar-div').css('overflow', 'hidden');
@@ -10043,7 +10062,7 @@ var w2confirm = function (msg, title, callBack) {
 		destroy: function () {
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'destroy', target: this.name });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// clean up
 			if ($(this.box).find('> div > div.w2ui-sidebar-div').length > 0) {
 				$(this.box)
@@ -10071,6 +10090,7 @@ var w2confirm = function (msg, title, callBack) {
 	$.extend(w2sidebar.prototype, w2utils.event);
 	w2obj.sidebar = w2sidebar;
 })();
+
 /************************************************************************
 *   Library: Web 2.0 UI for jQuery (using prototypical inheritance)
 *   - Following objects defined
@@ -10362,17 +10382,15 @@ var w2confirm = function (msg, title, callBack) {
 						markSearch 		: false
 					};
 					if (this.type == 'list') {
-						defaults.search = (options.items && options.items.length >= 10 ? true : false);
+						// defaults.search = (options.items && options.items.length >= 10 ? true : false);
+						defaults.openOnFocus = true;
 						defaults.suffix = '<div class="arrow-down" style="margin-top: '+ ((parseInt($(this.el).height()) - 6) / 2) +'px;"></div>';
-						$(this.el).addClass('w2ui-select').attr('readonly', true);
-						this.addFocus();
+						$(this.el).addClass('w2ui-select');
 					}
 					options = $.extend({}, defaults, options, {
 						align 		: 'both',		// same width as control
 						altRows		: true			// alternate row color
 					});
-					if (this.type == 'combo') options.search = false; // always false for combo because it uses main input for search
-					if (this.type == 'list') options.openOnFocus = true; // always true for list otherwise makes no sense
 					options.items 	 = this.normMenu(options.items);
 					options.selected = this.normMenu(options.selected);
 					this.options = options;
@@ -10525,7 +10543,7 @@ var w2confirm = function (msg, title, callBack) {
 				$(this.el).removeAttr('maxlength');
 			}
 			if (this.type == 'list') {
-				$(this.el).removeClass('w2ui-select').removeAttr('readonly');
+				$(this.el).removeClass('w2ui-select');
 			}
 			// remove events and data
 			$(this.el)
@@ -10549,6 +10567,7 @@ var w2confirm = function (msg, title, callBack) {
 			var obj		 = this;
 			var options	 = this.options;
 			var selected = $(this.el).data('selected');
+			var time 	 = (new Date()).getTime();
 			// enum
 			if (['enum', 'file'].indexOf(this.type) != -1) {
 				var html = '';
@@ -10684,6 +10703,7 @@ var w2confirm = function (msg, title, callBack) {
 				if (cntHeight < options.maxHeight) $(div).prop('scrollTop', 0);
 				$(this.el).css({ 'height' : (cntHeight + 2) + 'px' });
 			}
+			return (new Date()).getTime() - time;
 		},
 
 		reset: function () {
@@ -10780,26 +10800,8 @@ var w2confirm = function (msg, title, callBack) {
 				if ($("#w2ui-overlay").length > 0) $('#w2ui-overlay')[0].hide();
 				setTimeout(function () { obj.updateOverlay(); }, 150);
 			}
-			// list
-			if (obj.type == 'list') {
-				if (!$(obj.el).data('focused')) {
-					obj.helpers.focus.find('input').focus();
-				} else {
-					$(obj.el).css({ 'outline': 'auto 5px #7DB4F3', 'outline-offset': '-2px' });
-					setTimeout(function () {
-						if (!options.search) {
-							$(obj.el).data('keep_focus', true);
-							setTimeout(function () { $(obj.el).removeData('keep_focus'); }, 100);
-							obj.helpers.focus.find('input').focus();
-						} else {
-							setTimeout(function () { $('#w2ui-overlay #menu-search').focus(); }, 10);
-						}
-					}, 10);
-					obj.updateOverlay();
-				}
-			}
 			// menu
-			if (['combo', 'enum'].indexOf(obj.type) != -1) {
+			if (['list', 'combo', 'enum'].indexOf(obj.type) != -1) {
 				if ($(obj.el).attr('readonly')) return;
 				if ($("#w2ui-overlay").length > 0) $('#w2ui-overlay')[0].hide();
 				setTimeout(function () {
@@ -10818,7 +10820,7 @@ var w2confirm = function (msg, title, callBack) {
 			var options = obj.options;
 			var val 	= $(obj.el).val().trim();
 			// hide overlay
-			if (['color', 'date', 'time', 'combo', 'enum'].indexOf(obj.type) != -1) {
+			if (['color', 'date', 'time', 'list', 'combo', 'enum'].indexOf(obj.type) != -1) {
 				if ($("#w2ui-overlay").length > 0) $('#w2ui-overlay')[0].hide();
 			}
 			if (['int', 'float', 'money', 'currency', 'percent'].indexOf(obj.type) != -1) {
@@ -10854,13 +10856,6 @@ var w2confirm = function (msg, title, callBack) {
 							setTimeout(function () { $(obj.el).w2tag(''); }, 3000);
 						}
 					}
-				}
-			}
-			if (obj.type == 'list') {
-				if ($(obj.el).data('focused')) {
-					obj.helpers.focus.find('input').blur();
-				} else {
-					$(obj.el).css({ 'outline': 'none' });
 				}
 			}
 			// clear search input
@@ -11031,7 +11026,7 @@ var w2confirm = function (msg, title, callBack) {
 			}
 			// list/select/combo
 			if (['list', 'combo', 'enum'].indexOf(obj.type) != -1) {
-				if ($(obj.el).attr('readonly') && obj.type != 'list') return;
+				if ($(obj.el).attr('readonly')) return;
 				var cancel		= false;
 				var selected	= $(obj.el).data('selected');
 				// apply arrows
@@ -11079,11 +11074,7 @@ var w2confirm = function (msg, title, callBack) {
 							if (item) $(obj.el).data('selected', item).val(item.text).change();
 							if ($(obj.el).val() == '' && $(obj.el).data('selected')) $(obj.el).removeData('selected').val('').change();
 							// hide overlay
-							if (obj.type == 'list') {
-								if ($("#w2ui-overlay").length > 0) $('#w2ui-overlay')[0].hide();
-							} else {
-								obj.tmp.force_hide = true;
-							}
+							obj.tmp.force_hide = true;
 						}
 						break;
 					case 8: // delete
@@ -11215,6 +11206,7 @@ var w2confirm = function (msg, title, callBack) {
 							if (eventData2.isCancelled === true) return;
 							// default behavior
 							data = eventData2.data;
+							if (typeof data == 'string') data = JSON.parse(data);
 							if (data.status != 'success') {
 								console.log('ERROR: server did not return proper structure. It should return', { status: 'success', items: [{ id: 1, text: 'item' }] });
 								return;
@@ -11259,7 +11251,6 @@ var w2confirm = function (msg, title, callBack) {
 			var search 	= $(obj.el).val();
 			var target	= obj.el;
 			var ids = [];
-			if (obj.type == 'list') return; // list has its own search field
 			if (['enum'].indexOf(obj.type) != -1) {
 				target = $(obj.helpers.multi).find('input');
 				search = target.val();
@@ -11404,7 +11395,7 @@ var w2confirm = function (msg, title, callBack) {
 					el		= $(this.helpers.multi);
 					input	= $(el).find('input');
 				}
-				if ($(input).is(':focus') || this.type == 'list') {
+				if ($(input).is(':focus')) {
 					if (options.openOnFocus === false && $(input).val() == '' && obj.tmp.force_open !== true) {
 						$().w2overlay();
 						return;
@@ -11416,6 +11407,7 @@ var w2confirm = function (msg, title, callBack) {
 					}
 					if ($(input).val() != '') delete obj.tmp.force_open;
 					$(el).w2menu('refresh', w2utils.deepCopy({}, options, {
+						search		: false,
 						render		: options.renderDrop,
 						maxHeight	: options.maxDropHeight,
 						// selected with mouse
@@ -11437,24 +11429,9 @@ var w2confirm = function (msg, title, callBack) {
 									// event after
 									obj.trigger($.extend(eventData, { phase: 'after' }));
 								}
-							} else if (obj.type == 'list') {
-								if (typeof event.item != 'undefined') {
-									$(obj.el).data('selected', event.item).val(event.item.text).change();
-								}
-								// hide overlay, focus helper
-								setTimeout(function () {
-									$('#w2ui-overlay').remove();
-									if (options.search) obj.helpers.focus.find('input').focus();
-								}, 1);
 							} else {
 								$(obj.el).data('selected', event.item).val(event.item.text).change();
 							}
-						},
-						onHide: function (event) {
-							// need time out for poup to finaly get hidden
-							setTimeout(function () {
-								if (obj.type == 'list') obj.blur();
-							}, 1);
 						}
 					}));
 				}
@@ -11753,66 +11730,7 @@ var w2confirm = function (msg, title, callBack) {
 					});
 			}
 			obj.refresh();
-		},
-
-		addFocus: function () {
-			var obj 	= this;
-			setTimeout(function () {
-				var helper;
-				$(obj.el).before('<div class="w2ui-field-helper" style="margin-left: 30px; opacity: 0"><input type="text" size="1"></div>');
-				helper = $(obj.el).prev();
-				obj.helpers.focus = helper;
-				var index = $(obj.el).attr('tabindex');
-				var input = helper.find('input');
-				if (index > 0) input.attr('tabindex', index);
-				$(obj.el).attr('tabindex', -1);
-				input
-					.on('focus', function (event) {
-						var options = obj.options; // need it in this function
-						if (!$(obj.el).data('focused')) {
-							$(obj.el).data('focused', true);
-							$(obj.el).triggerHandler('focus');
-							if (options.search) {
-								setTimeout(function () { $('#w2ui-overlay #menu-search').focus(); }, 10);
-							}
-							// -- keep focus
-							$(obj.el).data('keep_focus', true);
-							setTimeout(function () { $(obj.el).removeData('keep_focus'); }, 100);
-						}
-					})
-					.on('blur', function (event) {
-						setTimeout(function () {
-							if ($(obj.el).data('keep_focus')) return;
-							if ($(obj.el).data('focused')) {
-								$(obj.el).removeData('focused');
-								$(obj.el).triggerHandler('blur');
-								if ($("#w2ui-overlay").length > 0) $('#w2ui-overlay')[0].hide();
-							}
-						}, 30);
-					})
-					.on('keyup', function (event) { obj.keyUp(event) })
-					.on('keydown', function (event) {
-						if (event.keyCode == 40) {
-							if ($('#w2ui-overlay').length == 0) {
-								setTimeout(function () {
-									obj.updateOverlay();
-									setTimeout(function () { $('#w2ui-overlay #menu-search').focus(); }, 10);
-									// -- keep focus
-									$(obj.el).data('keep_focus', true);
-									setTimeout(function () { $(obj.el).removeData('keep_focus'); }, 100);
-								}, 10);
-								return;
-							}
-						}
-						if (event.keyCode == 27 && $('#w2ui-overlay').length == 0) {
-							$(obj.el).val('').removeData('selected').change();
-							return;
-						}
-						obj.keyDown(event);
-					})
-					.on('keypress', function (event) { obj.keyPress(event); });
-			}, 1);
-		},
+		},	
 
 		addFile: function (file) {
 			var obj		 = this;
@@ -12047,6 +11965,7 @@ var w2confirm = function (msg, title, callBack) {
 	w2obj.field = w2field;
 
 }) (jQuery);
+
 /************************************************************************
 *   Library: Web 2.0 UI for jQuery (using prototypical inheritance)
 *   - Following objects defined
@@ -12194,6 +12113,7 @@ var w2confirm = function (msg, title, callBack) {
 				object.render(object.box);
 			}
 			return object;
+		
 		} else if (w2ui[$(this).attr('name')]) {
 			var obj = w2ui[$(this).attr('name')];
 			obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
@@ -12258,7 +12178,7 @@ var w2confirm = function (msg, title, callBack) {
 			var eventData = this.trigger({ target: this.name, type: 'error', message: msg , xhr: this.last.xhr });
 			if (eventData.isCancelled === true) {
 				if (typeof callBack == 'function') callBack();
-				return false;
+				return;
 			}
 			// need a time out because message might be already up)
 			setTimeout(function () { w2alert(msg, 'Error');	}, 1);
@@ -12388,7 +12308,7 @@ var w2confirm = function (msg, title, callBack) {
 			$.extend(params, postData);
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'request', target: this.name, url: this.url, postData: params });
-			if (eventData.isCancelled === true) { if (typeof callBack == 'function') callBack({ status: 'error', message: 'Request aborted.' }); return false; }
+			if (eventData.isCancelled === true) { if (typeof callBack == 'function') callBack({ status: 'error', message: 'Request aborted.' }); return; }
 			// default action
 			this.record	  = {};
 			this.original = {};
@@ -12408,7 +12328,7 @@ var w2confirm = function (msg, title, callBack) {
 					var eventData = obj.trigger({ phase: 'before', target: obj.name, type: 'load', xhr: xhr, status: status });
 					if (eventData.isCancelled === true) {
 						if (typeof callBack == 'function') callBack({ status: 'error', message: 'Request aborted.' });
-						return false;
+						return;
 					}
 					// parse server response
 					var data;
@@ -12499,7 +12419,7 @@ var w2confirm = function (msg, title, callBack) {
 				var eventData = obj.trigger({ phase: 'before', type: 'submit', target: obj.name, url: obj.url, postData: params });
 				if (eventData.isCancelled === true) {
 					if (typeof callBack == 'function') callBack({ status: 'error', message: 'Saving aborted.' });
-					return false;
+					return;
 				}
 				// default action
 				var url = eventData.url;
@@ -12528,7 +12448,7 @@ var w2confirm = function (msg, title, callBack) {
 						var eventData = obj.trigger({ phase: 'before', target: obj.name, type: 'save', xhr: xhr, status: status });
 						if (eventData.isCancelled === true) {
 							if (typeof callBack == 'function') callBack({ status: 'error', message: 'Saving aborted.' });
-							return false;
+							return;
 						}
 						// parse server response
 						var data;
@@ -12635,7 +12555,7 @@ var w2confirm = function (msg, title, callBack) {
 		action: function (action, event) {
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: action, type: 'action', originalEvent: event });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default actions
 			if (typeof (this.actions[action]) == 'function') {
 				this.actions[action].call(this, event);
@@ -12648,7 +12568,7 @@ var w2confirm = function (msg, title, callBack) {
 			var obj = this;
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'resize' });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default behaviour
 			var main 	= $(this.box).find('> div');
 			var header	= $(this.box).find('> div .w2ui-form-header');
@@ -12708,7 +12628,7 @@ var w2confirm = function (msg, title, callBack) {
 			});
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'refresh', page: this.page })
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default action
 			$(this.box).find('.w2ui-page').hide();
 			$(this.box).find('.w2ui-page.page-' + this.page).show();
@@ -12771,7 +12691,7 @@ var w2confirm = function (msg, title, callBack) {
 					var eventData = obj.trigger({ phase: 'before', target: this.name, type: 'change', value_new: value_new, value_previous: value_previous });
 					if (eventData.isCancelled === true) {
 						$(this).val(obj.record[this.name]); // return previous value
-						return false;
+						return;
 					}
 					// default action
 					var val = this.value;
@@ -12909,7 +12829,7 @@ var w2confirm = function (msg, title, callBack) {
 			if (!this.isGenerated) return;
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'render', box: (typeof box != 'undefined' ? box : this.box) });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default actions
 			if ($.isEmptyObject(this.original) && !$.isEmptyObject(this.record)) {
 				this.original = w2utils.deepCopy({}, this.record);
@@ -12930,7 +12850,7 @@ var w2confirm = function (msg, title, callBack) {
 				this.toolbar = $().w2toolbar($.extend({}, this.toolbar, { name: this.name +'_toolbar', owner: this }));
 				this.toolbar.on('click', function (event) {
 					var eventData = obj.trigger({ phase: 'before', type: 'toolbar', target: event.target, originalEvent: event });
-					if (eventData.isCancelled === true) return false;
+					if (eventData.isCancelled === true) return;
 					// no default action
 					obj.trigger($.extend(eventData, { phase: 'after' }));
 				});
@@ -12976,7 +12896,7 @@ var w2confirm = function (msg, title, callBack) {
 		destroy: function () {
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'destroy' });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// clean up
 			if (typeof this.toolbar == 'object' && this.toolbar.destroy) this.toolbar.destroy();
 			if (typeof this.tabs == 'object' && this.tabs.destroy) this.tabs.destroy();
@@ -12996,6 +12916,7 @@ var w2confirm = function (msg, title, callBack) {
 	$.extend(w2form.prototype, w2utils.event);
 	w2obj.form = w2form;
 })();
+
 /************************************************************************
 *	Library: Web 2.0 UI for jQuery (using prototypical inheritance)
 *	- Following objects defined
@@ -13535,7 +13456,7 @@ var w2confirm = function (msg, title, callBack) {
 				var imgClass = (item.icon !== null && typeof item.icon !== 'undefined') ? ' '+item.icon : ' icon-none';
 				if (item.img !== null && typeof item.img !== 'undefined') imgClass = ' w2ui-icon '+item.img;
 
-				var withDescription = (typeof item.description !== undefined && item.description !== '');
+				var withDescription = (typeof item.description !== 'undefined' && item.description !== '');
 				var withExtra = (obj.extraCols.length > 0);
 				var rslt = getItemTemplate(withDescription, withExtra);
 				rslt.id = obj.itemNodeId(item.id);
@@ -13641,7 +13562,7 @@ var w2confirm = function (msg, title, callBack) {
 			var time = (new Date()).getTime();
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'render', target: this.name, box: box });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default action
 			if (typeof box !== 'undefined' && box !== null && this.box !== box) {
 				if (this.lastItm) {
@@ -13678,7 +13599,7 @@ var w2confirm = function (msg, title, callBack) {
 		destroy: function () {
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'destroy', target: this.name });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// clean up
 			if (this.box) {
 				this.lastItm = null;

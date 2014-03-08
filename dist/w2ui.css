@@ -2256,18 +2256,12 @@ select {
   padding: 0px 4px 0px 2px;
 }
 .w2ui-toolbar table.w2ui-button .w2ui-tb-down {
-  width: 14px;
-  height: 24px;
-  padding: 2px;
+  padding: 3px;
 }
 .w2ui-toolbar table.w2ui-button .w2ui-tb-down > div {
-  position: absolute;
-  width: 0px;
-  height: 28px;
-  line-height: 100%;
   border: 4px solid transparent;
   border-top: 5px solid #8D99A7;
-  margin-top: -2px;
+  margin-top: 5px;
 }
 .w2ui-toolbar table.w2ui-button.over {
   border: 1px solid #cccccc;

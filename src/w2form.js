@@ -145,6 +145,7 @@
 				object.render(object.box);
 			}
 			return object;
+		
 		} else if (w2ui[$(this).attr('name')]) {
 			var obj = w2ui[$(this).attr('name')];
 			obj[method].apply(obj, Array.prototype.slice.call(arguments, 1));
@@ -209,7 +210,7 @@
 			var eventData = this.trigger({ target: this.name, type: 'error', message: msg , xhr: this.last.xhr });
 			if (eventData.isCancelled === true) {
 				if (typeof callBack == 'function') callBack();
-				return false;
+				return;
 			}
 			// need a time out because message might be already up)
 			setTimeout(function () { w2alert(msg, 'Error');	}, 1);
@@ -339,7 +340,7 @@
 			$.extend(params, postData);
 			// event before
 			var eventData = this.trigger({ phase: 'before', type: 'request', target: this.name, url: this.url, postData: params });
-			if (eventData.isCancelled === true) { if (typeof callBack == 'function') callBack({ status: 'error', message: 'Request aborted.' }); return false; }
+			if (eventData.isCancelled === true) { if (typeof callBack == 'function') callBack({ status: 'error', message: 'Request aborted.' }); return; }
 			// default action
 			this.record	  = {};
 			this.original = {};
@@ -359,7 +360,7 @@
 					var eventData = obj.trigger({ phase: 'before', target: obj.name, type: 'load', xhr: xhr, status: status });
 					if (eventData.isCancelled === true) {
 						if (typeof callBack == 'function') callBack({ status: 'error', message: 'Request aborted.' });
-						return false;
+						return;
 					}
 					// parse server response
 					var data;
@@ -450,7 +451,7 @@
 				var eventData = obj.trigger({ phase: 'before', type: 'submit', target: obj.name, url: obj.url, postData: params });
 				if (eventData.isCancelled === true) {
 					if (typeof callBack == 'function') callBack({ status: 'error', message: 'Saving aborted.' });
-					return false;
+					return;
 				}
 				// default action
 				var url = eventData.url;
@@ -479,7 +480,7 @@
 						var eventData = obj.trigger({ phase: 'before', target: obj.name, type: 'save', xhr: xhr, status: status });
 						if (eventData.isCancelled === true) {
 							if (typeof callBack == 'function') callBack({ status: 'error', message: 'Saving aborted.' });
-							return false;
+							return;
 						}
 						// parse server response
 						var data;
@@ -586,7 +587,7 @@
 		action: function (action, event) {
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: action, type: 'action', originalEvent: event });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default actions
 			if (typeof (this.actions[action]) == 'function') {
 				this.actions[action].call(this, event);
@@ -599,7 +600,7 @@
 			var obj = this;
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'resize' });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default behaviour
 			var main 	= $(this.box).find('> div');
 			var header	= $(this.box).find('> div .w2ui-form-header');
@@ -659,7 +660,7 @@
 			});
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'refresh', page: this.page })
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default action
 			$(this.box).find('.w2ui-page').hide();
 			$(this.box).find('.w2ui-page.page-' + this.page).show();
@@ -722,7 +723,7 @@
 					var eventData = obj.trigger({ phase: 'before', target: this.name, type: 'change', value_new: value_new, value_previous: value_previous });
 					if (eventData.isCancelled === true) {
 						$(this).val(obj.record[this.name]); // return previous value
-						return false;
+						return;
 					}
 					// default action
 					var val = this.value;
@@ -860,7 +861,7 @@
 			if (!this.isGenerated) return;
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'render', box: (typeof box != 'undefined' ? box : this.box) });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// default actions
 			if ($.isEmptyObject(this.original) && !$.isEmptyObject(this.record)) {
 				this.original = w2utils.deepCopy({}, this.record);
@@ -881,7 +882,7 @@
 				this.toolbar = $().w2toolbar($.extend({}, this.toolbar, { name: this.name +'_toolbar', owner: this }));
 				this.toolbar.on('click', function (event) {
 					var eventData = obj.trigger({ phase: 'before', type: 'toolbar', target: event.target, originalEvent: event });
-					if (eventData.isCancelled === true) return false;
+					if (eventData.isCancelled === true) return;
 					// no default action
 					obj.trigger($.extend(eventData, { phase: 'after' }));
 				});
@@ -927,7 +928,7 @@
 		destroy: function () {
 			// event before
 			var eventData = this.trigger({ phase: 'before', target: this.name, type: 'destroy' });
-			if (eventData.isCancelled === true) return false;
+			if (eventData.isCancelled === true) return;
 			// clean up
 			if (typeof this.toolbar == 'object' && this.toolbar.destroy) this.toolbar.destroy();
 			if (typeof this.tabs == 'object' && this.tabs.destroy) this.tabs.destroy();
